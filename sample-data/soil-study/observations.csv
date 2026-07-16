@@ -1,0 +1,5 @@
+observation_id,participant_id,soil_moisture,recorded_at
+O001,P001,42.5,2026-02-01
+O002,P002,-99,01/02/2026
+O003,P999,38.1,2026-02-02
+O003,P999,38.1,2026-02-02

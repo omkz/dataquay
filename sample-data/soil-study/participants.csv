@@ -1,0 +1,5 @@
+participant_id,name,email,age,joined_at
+P001,Alice,alice@example.com,29,2026-01-15
+P002,Bob,bob@example.com,,15/01/2026
+P002,Bob,bob@example.com,34,2026-01-15
+P003,Charlie,,9999,January 16 2026
