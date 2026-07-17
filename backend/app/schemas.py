@@ -92,3 +92,31 @@ class RemediationRecommendation(BaseModel):
 
 class RecommendationResponse(BaseModel):
     recommendations: list[RemediationRecommendation]
+
+
+class RemediationOperation(StrEnum):
+    REVIEW_MISSING_VALUES = "review_missing_values"
+    REMOVE_EXACT_DUPLICATE_ROWS = "remove_exact_duplicate_rows"
+    RESOLVE_DUPLICATE_IDENTIFIERS = "resolve_duplicate_identifiers"
+    RECONCILE_MISSING_REFERENCES = "reconcile_missing_references"
+    NORMALIZE_RECOGNIZED_DATE_FORMATS = "normalize_recognized_date_formats"
+    REVIEW_SUSPICIOUS_NUMERIC_VALUES = "review_suspicious_numeric_values"
+    REVIEW_PROBABLE_PERSONAL_DATA = "review_probable_personal_data"
+
+
+class RemediationPreviewRequest(BaseModel):
+    approved_recommendations: list[RemediationRecommendation]
+
+
+class RemediationAction(BaseModel):
+    related_finding: FindingReference
+    target_file: str
+    target_column: str | None
+    proposed_operation: RemediationOperation
+    can_apply_automatically: bool
+    manual_review_reason: str | None
+    expected_result: str
+
+
+class RemediationPreviewResponse(BaseModel):
+    actions: list[RemediationAction]
