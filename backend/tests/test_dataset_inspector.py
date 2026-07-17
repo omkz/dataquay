@@ -108,3 +108,41 @@ def test_inspect_dataset_detects_quality_and_reference_findings(
     }
 
     assert all(finding.message for finding in inspection.findings)
+
+
+def test_inspect_dataset_detects_mixed_dates_and_suspicious_numbers(
+    tmp_path: Path,
+) -> None:
+    dataset_path = tmp_path / "format-dataset"
+    dataset_path.mkdir()
+    (dataset_path / "events.csv").write_text(
+        "event_id,event_date,result\n"
+        "E001,2026-01-01,-99\n"
+        "E002,02/01/2026,9999\n",
+        encoding="utf-8",
+    )
+
+    inspection = inspect_dataset(dataset_path)
+    findings = {finding.type.value: finding for finding in inspection.findings}
+
+    date_finding = findings["inconsistent_date_formats"]
+    assert date_finding.severity.value == "medium"
+    assert date_finding.file == "events.csv"
+    assert date_finding.affected_column == "event_date"
+    assert date_finding.evidence == {
+        "detected_formats": ["YYYY-MM-DD", "DD/MM/YYYY"],
+        "triggering_values": [
+            "2026-01-01 (YYYY-MM-DD)",
+            "02/01/2026 (DD/MM/YYYY)",
+        ],
+    }
+
+    numeric_finding = findings["suspicious_numeric_values"]
+    assert numeric_finding.severity.value == "medium"
+    assert numeric_finding.file == "events.csv"
+    assert numeric_finding.affected_column == "result"
+    assert numeric_finding.evidence == {
+        "suspicious_values": ["-99", "9999"],
+        "occurrence_count": 2,
+        "reason": "matches a common placeholder or invalid sentinel value",
+    }

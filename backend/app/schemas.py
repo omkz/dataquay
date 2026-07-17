@@ -33,6 +33,8 @@ class FindingType(StrEnum):
     DUPLICATE_ROWS = "duplicate_rows"
     DUPLICATE_IDENTIFIER_VALUES = "duplicate_identifier_values"
     MISSING_REFERENCE = "missing_reference"
+    INCONSISTENT_DATE_FORMATS = "inconsistent_date_formats"
+    SUSPICIOUS_NUMERIC_VALUES = "suspicious_numeric_values"
 
 
 class FindingSeverity(StrEnum):

@@ -1,4 +1,5 @@
 from collections import Counter
+from datetime import datetime
 from pathlib import Path
 
 import polars as pl
@@ -9,6 +10,13 @@ from app.schemas import (
     InspectedFile,
     InspectionFinding,
 )
+
+DATE_FORMATS = (
+    ("YYYY-MM-DD", "%Y-%m-%d"),
+    ("DD/MM/YYYY", "%d/%m/%Y"),
+    ("Month D YYYY", "%B %d %Y"),
+)
+SUSPICIOUS_NUMERIC_SENTINELS = {-9999.0, -999.0, -99.0, -9.0, 999.0, 9999.0}
 
 
 def detect_inspection_findings(
@@ -59,6 +67,13 @@ def detect_inspection_findings(
                 )
             )
 
+        findings.extend(
+            _detect_inconsistent_date_formats(file, data_frames[file.relative_path])
+        )
+        findings.extend(
+            _detect_suspicious_numeric_values(file, data_frames[file.relative_path])
+        )
+
         identifier_column = _primary_identifier_column(profile.column_names)
         if identifier_column is None:
             continue
@@ -97,6 +112,117 @@ def detect_inspection_findings(
         _detect_missing_references(csv_files, data_frames, primary_identifiers)
     )
     return findings
+
+
+def _detect_inconsistent_date_formats(
+    file: InspectedFile, data: pl.DataFrame
+) -> list[InspectionFinding]:
+    findings: list[InspectionFinding] = []
+
+    for column in data.columns:
+        if data[column].dtype != pl.String or not _is_date_column(column):
+            continue
+
+        values_by_format: dict[str, list[str]] = {}
+        values = data[column].drop_nulls().unique(maintain_order=True).to_list()
+        for value in values:
+            value_text = str(value)
+            date_format = _classify_date_format(value_text)
+            if date_format is not None:
+                values_by_format.setdefault(date_format, []).append(value_text)
+
+        if len(values_by_format) < 2:
+            continue
+
+        detected_formats = [
+            label for label, _ in DATE_FORMATS if label in values_by_format
+        ]
+        triggering_values = [
+            f"{value} ({label})"
+            for label in detected_formats
+            for value in values_by_format[label]
+        ]
+        findings.append(
+            InspectionFinding(
+                type=FindingType.INCONSISTENT_DATE_FORMATS,
+                severity=FindingSeverity.MEDIUM,
+                file=file.relative_path,
+                affected_column=column,
+                evidence={
+                    "detected_formats": detected_formats,
+                    "triggering_values": triggering_values,
+                },
+                message=(
+                    f"Column '{column}' contains inconsistent date formats: "
+                    f"{', '.join(detected_formats)}."
+                ),
+            )
+        )
+
+    return findings
+
+
+def _detect_suspicious_numeric_values(
+    file: InspectedFile, data: pl.DataFrame
+) -> list[InspectionFinding]:
+    findings: list[InspectionFinding] = []
+
+    for column in data.columns:
+        if not data[column].dtype.is_numeric():
+            continue
+
+        suspicious_values = [
+            value
+            for value in data[column].drop_nulls().to_list()
+            if float(value) in SUSPICIOUS_NUMERIC_SENTINELS
+        ]
+        if not suspicious_values:
+            continue
+
+        formatted_values = sorted(
+            {_format_numeric_value(value) for value in suspicious_values}
+        )
+        findings.append(
+            InspectionFinding(
+                type=FindingType.SUSPICIOUS_NUMERIC_VALUES,
+                severity=FindingSeverity.MEDIUM,
+                file=file.relative_path,
+                affected_column=column,
+                evidence={
+                    "suspicious_values": formatted_values,
+                    "occurrence_count": len(suspicious_values),
+                    "reason": "matches a common placeholder or invalid sentinel value",
+                },
+                message=(
+                    f"Column '{column}' contains suspicious numeric values: "
+                    f"{', '.join(formatted_values)}."
+                ),
+            )
+        )
+
+    return findings
+
+
+def _is_date_column(column: str) -> bool:
+    normalized = column.lower()
+    return normalized == "date" or normalized.endswith(("_date", "_at"))
+
+
+def _classify_date_format(value: str) -> str | None:
+    for label, date_format in DATE_FORMATS:
+        try:
+            datetime.strptime(value, date_format)
+        except ValueError:
+            continue
+        return label
+    return None
+
+
+def _format_numeric_value(value: int | float) -> str:
+    numeric_value = float(value)
+    if numeric_value.is_integer():
+        return str(int(numeric_value))
+    return str(numeric_value)
 
 
 def _primary_identifier_column(column_names: list[str]) -> str | None:

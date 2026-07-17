@@ -102,7 +102,7 @@ def test_inspect_sample_dataset_returns_inventory_and_csv_profiles() -> None:
         (finding["type"], finding["file"], finding["affected_column"]): finding
         for finding in inspection["findings"]
     }
-    assert len(findings) == 6
+    assert len(findings) == 10
 
     assert findings[("missing_values", "participants.csv", "email")] == {
         "type": "missing_values",
@@ -136,4 +136,38 @@ def test_inspect_sample_dataset_returns_inventory_and_csv_profiles() -> None:
         "referenced_file": "participants.csv",
         "missing_values": ["P999"],
         "reference_count": 2,
+    }
+    assert findings[
+        ("inconsistent_date_formats", "participants.csv", "joined_at")
+    ]["evidence"] == {
+        "detected_formats": ["YYYY-MM-DD", "DD/MM/YYYY", "Month D YYYY"],
+        "triggering_values": [
+            "2026-01-15 (YYYY-MM-DD)",
+            "15/01/2026 (DD/MM/YYYY)",
+            "January 16 2026 (Month D YYYY)",
+        ],
+    }
+    assert findings[
+        ("inconsistent_date_formats", "observations.csv", "recorded_at")
+    ]["evidence"] == {
+        "detected_formats": ["YYYY-MM-DD", "DD/MM/YYYY"],
+        "triggering_values": [
+            "2026-02-01 (YYYY-MM-DD)",
+            "2026-02-02 (YYYY-MM-DD)",
+            "01/02/2026 (DD/MM/YYYY)",
+        ],
+    }
+    assert findings[
+        ("suspicious_numeric_values", "participants.csv", "age")
+    ]["evidence"] == {
+        "suspicious_values": ["9999"],
+        "occurrence_count": 1,
+        "reason": "matches a common placeholder or invalid sentinel value",
+    }
+    assert findings[
+        ("suspicious_numeric_values", "observations.csv", "soil_moisture")
+    ]["evidence"] == {
+        "suspicious_values": ["-99"],
+        "occurrence_count": 1,
+        "reason": "matches a common placeholder or invalid sentinel value",
     }
