@@ -102,6 +102,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "polars" },
     { name = "pydantic-ai" },
+    { name = "python-multipart" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -116,6 +117,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.139.2" },
     { name = "polars", specifier = ">=1.42.1" },
     { name = "pydantic-ai", specifier = ">=2.12.0" },
+    { name = "python-multipart", specifier = ">=0.0.32" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.51.0" },
 ]
 

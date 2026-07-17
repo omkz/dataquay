@@ -75,6 +75,17 @@ class DatasetInspection(BaseModel):
     findings: list[InspectionFinding]
 
 
+class DatasetUploadResponse(BaseModel):
+    dataset_id: str
+    file_name: str
+    dataset_name: str
+    archive_size_bytes: int
+    archive_checksum_sha256: str
+    extracted_file_count: int
+    extracted_size_bytes: int
+    inspection_url: str
+
+
 class FindingReference(BaseModel):
     type: FindingType
     file: str
