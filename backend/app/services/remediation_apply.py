@@ -97,6 +97,9 @@ def apply_approved_remediation_actions(
             source_directory=str(source_root),
             working_copy_directory=str(working_root),
             files=file_checksums,
+            applied_actions=applied_actions,
+            skipped_actions=skipped_actions,
+            failed_actions=failed_actions,
         ),
         get_checksum_manifest_path(working_root),
     )

@@ -139,6 +139,9 @@ class RemediationChecksumManifest(BaseModel):
     source_directory: str
     working_copy_directory: str
     files: list[FileChecksumRecord]
+    applied_actions: list[RemediationActionResult] = Field(default_factory=list)
+    skipped_actions: list[RemediationActionResult] = Field(default_factory=list)
+    failed_actions: list[RemediationActionResult] = Field(default_factory=list)
 
 
 class RemediationApplyResponse(BaseModel):
@@ -166,4 +169,20 @@ class DatasetValidationResult(BaseModel):
     source_checksums_verified: bool
     output_checksums_verified: bool
     original_files_unchanged: bool
+    readiness: ReadinessSummary
+
+
+class PackageFileEntry(BaseModel):
+    relative_path: str
+    size_bytes: int
+    checksum_sha256: str
+
+
+class PackageGenerationResult(BaseModel):
+    dataset_name: str
+    zip_file_name: str
+    zip_size_bytes: int
+    zip_checksum_sha256: str
+    download_url: str
+    files: list[PackageFileEntry]
     readiness: ReadinessSummary

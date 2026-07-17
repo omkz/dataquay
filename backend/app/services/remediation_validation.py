@@ -33,7 +33,7 @@ def validate_remediated_dataset(
             "The remediated working copy does not exist; apply remediation first."
         )
 
-    manifest = _load_checksum_manifest(working_root)
+    manifest = load_checksum_manifest(working_root)
     if (
         manifest.source_directory != str(source_root)
         or manifest.working_copy_directory != str(working_root)
@@ -75,7 +75,10 @@ def validate_remediated_dataset(
     )
 
 
-def _load_checksum_manifest(working_root: Path) -> RemediationChecksumManifest:
+def load_checksum_manifest(
+    working_copy_directory: str | Path,
+) -> RemediationChecksumManifest:
+    working_root = Path(working_copy_directory).resolve()
     manifest_path = get_checksum_manifest_path(working_root)
     try:
         manifest_content = manifest_path.read_text(encoding="utf-8")
