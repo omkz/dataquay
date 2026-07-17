@@ -39,7 +39,8 @@ Create the initial frontend, backend, worker, database, and local infrastructure
 * MinIO or another S3-compatible storage service is available.
 * Temporal server and worker can start.
 * All services run through Docker Compose.
-* Environment variables are documented in `.env.example`.
+* Environment variables are documented in `frontend/.env.example` and
+  `backend/.env.example`.
 
 ---
 

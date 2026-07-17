@@ -1,6 +1,10 @@
+# Local environment files and secrets
 .env
 .env.*
-!.env.example
+
+# Commit service-specific templates only
+!frontend/.env.example
+!backend/.env.example
 
 __pycache__/
 *.py[cod]

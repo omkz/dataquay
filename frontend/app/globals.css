@@ -632,6 +632,300 @@ tbody tr:last-child td {
   font-size: 9px;
 }
 
+.recommendation-heading {
+  align-items: start;
+}
+
+.section-description {
+  max-width: 620px;
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.generate-button {
+  display: inline-flex;
+  min-width: 210px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 18px;
+  border: 1px solid var(--brand);
+  border-radius: 10px;
+  background: var(--brand);
+  color: white;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 750;
+  box-shadow: 0 8px 22px rgb(12 102 80 / 16%);
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.generate-button:hover:not(:disabled) {
+  background: var(--brand-dark);
+  box-shadow: 0 10px 28px rgb(12 102 80 / 22%);
+  transform: translateY(-1px);
+}
+
+.generate-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.button-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgb(255 255 255 / 35%);
+  border-top-color: white;
+  border-radius: 999px;
+  animation: spin 0.8s linear infinite;
+}
+
+.recommendation-state,
+.recommendation-loading {
+  display: flex;
+  min-height: 128px;
+  align-items: center;
+  gap: 18px;
+  padding: 24px;
+  border: 1px dashed #bccbc4;
+  border-radius: 15px;
+  background: rgb(255 255 255 / 66%);
+}
+
+.recommendation-state-mark {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+}
+
+.recommendation-state-mark.empty {
+  background: #edf1ef;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.recommendation-state strong {
+  display: block;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.recommendation-state p,
+.recommendation-loading p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.recommendation-configuration {
+  border-style: solid;
+  border-color: #e5c987;
+  background: #fffaf0;
+}
+
+.recommendation-configuration .recommendation-state-mark {
+  background: #f8e8bd;
+  color: #785010;
+}
+
+.recommendation-error {
+  border-style: solid;
+  border-color: #e7bcb4;
+  background: #fff7f5;
+}
+
+.recommendation-error .recommendation-state-mark {
+  background: #f8e3df;
+  color: var(--high);
+}
+
+.recommendation-loading {
+  display: grid;
+  align-items: center;
+}
+
+.recommendation-loading > div {
+  display: grid;
+  gap: 9px;
+}
+
+.recommendation-skeleton-title {
+  width: min(360px, 70%);
+  height: 18px;
+}
+
+.recommendation-skeleton-copy {
+  width: min(680px, 95%);
+  height: 11px;
+}
+
+.recommendation-skeleton-copy.short {
+  width: min(480px, 75%);
+}
+
+.recommendation-list {
+  display: grid;
+  gap: 12px;
+}
+
+.recommendation-card {
+  padding: 26px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background:
+    linear-gradient(135deg, rgb(223 241 233 / 22%), transparent 42%),
+    var(--surface);
+  box-shadow: 0 10px 32px rgb(23 33 29 / 4%);
+}
+
+.recommendation-card-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.recommendation-index {
+  color: #7c8983;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.approval-badge {
+  padding: 5px 8px;
+  border: 1px solid #bfd6cc;
+  border-radius: 999px;
+  background: #f0f8f4;
+  color: var(--brand-dark);
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.approval-badge.required {
+  border-color: #e3c27e;
+  background: #fff8e8;
+  color: #805718;
+}
+
+.recommendation-card h3 {
+  margin: 16px 0 14px;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+
+.related-finding {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f3f7f5;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.related-finding > span {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.related-finding strong {
+  color: #33413b;
+  font-size: 10px;
+}
+
+.related-finding code {
+  margin-left: auto;
+  color: #59665f;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+}
+
+.recommendation-copy-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.recommendation-copy-grid > div {
+  padding: 15px 16px;
+  border: 1px solid #e5ebe8;
+  border-radius: 9px;
+}
+
+.recommendation-copy-grid > div > span,
+.confidence-row > span {
+  color: #839089;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.recommendation-copy-grid p {
+  margin: 7px 0 0;
+  color: #47534d;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.recommendation-copy-grid .proposed-action {
+  border-color: #cfe0d8;
+  background: #f6faf8;
+}
+
+.confidence-row {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.confidence-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e7ece9;
+}
+
+.confidence-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand);
+}
+
+.confidence-row > strong {
+  color: #46534d;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+}
+
 .site-footer {
   display: flex;
   justify-content: space-between;
@@ -770,6 +1064,12 @@ tbody tr:last-child td {
   }
 }
 
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 780px) {
   .site-header,
   .site-footer,
@@ -821,6 +1121,15 @@ tbody tr:last-child td {
     margin-top: 48px;
   }
 
+  .recommendation-heading form,
+  .generate-button {
+    width: 100%;
+  }
+
+  .recommendation-copy-grid {
+    grid-template-columns: 1fr;
+  }
+
   .finding-location {
     justify-content: start;
   }
@@ -863,6 +1172,20 @@ tbody tr:last-child td {
 
   .finding-body {
     padding: 20px;
+  }
+
+  .recommendation-card {
+    padding: 20px;
+  }
+
+  .recommendation-card-topline,
+  .related-finding {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .related-finding code {
+    margin-left: 0;
   }
 
   .site-footer {

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { RecommendationsPanel } from "@/app/components/RecommendationsPanel";
 import type {
   DatasetInspection,
   InspectionFinding,
@@ -175,6 +176,8 @@ export function DatasetOverview({
             ))}
           </div>
         </section>
+
+        <RecommendationsPanel />
       </main>
 
       <footer className="site-footer">

@@ -46,16 +46,40 @@ export type DatasetInspection = {
   findings: InspectionFinding[];
 };
 
+export type RemediationRecommendation = {
+  related_finding: {
+    type: string;
+    file: string;
+    affected_column: string | null;
+  };
+  short_title: string;
+  rationale: string;
+  proposed_action: string;
+  confidence: number;
+  human_approval_required: boolean;
+};
+
+export type RecommendationActionState = {
+  status: "idle" | "success" | "configuration_error" | "error";
+  recommendations: RemediationRecommendation[];
+  message?: string;
+};
+
 export type InspectionResult =
   | { ok: true; data: DatasetInspection }
   | { ok: false; message: string };
 
 const DEFAULT_BACKEND_URL = "http://localhost:8000";
 
+export function getBackendUrl() {
+  return (process.env.DATAQUAY_BACKEND_URL || DEFAULT_BACKEND_URL).replace(
+    /\/$/,
+    "",
+  );
+}
+
 export async function getSampleDatasetInspection(): Promise<InspectionResult> {
-  const backendUrl = (
-    process.env.DATAQUAY_BACKEND_URL || DEFAULT_BACKEND_URL
-  ).replace(/\/$/, "");
+  const backendUrl = getBackendUrl();
 
   try {
     const response = await fetch(`${backendUrl}/api/inspect/sample-dataset`, {
@@ -87,6 +111,43 @@ export async function getSampleDatasetInspection(): Promise<InspectionResult> {
         "DataQuay could not reach the inspection API. Confirm that the backend is running and the backend URL is correct.",
     };
   }
+}
+
+export function isRecommendationResponse(
+  value: unknown,
+): value is { recommendations: RemediationRecommendation[] } {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as { recommendations?: unknown };
+  return (
+    Array.isArray(candidate.recommendations) &&
+    candidate.recommendations.every(isRemediationRecommendation)
+  );
+}
+
+function isRemediationRecommendation(
+  value: unknown,
+): value is RemediationRecommendation {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<RemediationRecommendation>;
+  const finding = candidate.related_finding;
+  return Boolean(
+    finding &&
+      typeof finding.type === "string" &&
+      typeof finding.file === "string" &&
+      (typeof finding.affected_column === "string" ||
+        finding.affected_column === null) &&
+      typeof candidate.short_title === "string" &&
+      typeof candidate.rationale === "string" &&
+      typeof candidate.proposed_action === "string" &&
+      typeof candidate.confidence === "number" &&
+      typeof candidate.human_approval_required === "boolean",
+  );
 }
 
 function isDatasetInspection(value: unknown): value is DatasetInspection {
