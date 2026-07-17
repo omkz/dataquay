@@ -1,8 +1,9 @@
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
-from app.schemas import CsvProfile, DatasetInspection
+from app.agents.data_steward import AIConfigurationError, generate_recommendations
+from app.schemas import CsvProfile, DatasetInspection, RecommendationResponse
 from app.services.csv_profiler import profile_csv
 from app.services.dataset_inspector import inspect_dataset
 
@@ -22,3 +23,15 @@ def inspect_sample() -> CsvProfile:
 @router.get("/sample-dataset", response_model=DatasetInspection)
 def inspect_sample_dataset() -> DatasetInspection:
     return inspect_dataset(SAMPLE_DATASET_PATH)
+
+
+@router.post(
+    "/sample-dataset/recommendations",
+    response_model=RecommendationResponse,
+)
+async def recommend_sample_dataset_remediation() -> RecommendationResponse:
+    inspection = inspect_dataset(SAMPLE_DATASET_PATH)
+    try:
+        return await generate_recommendations(inspection)
+    except AIConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc

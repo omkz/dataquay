@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
+import pytest
 
 from app.main import app
+from app.schemas import RecommendationResponse
 
 
 client = TestClient(app)
@@ -206,3 +208,65 @@ def test_inspect_sample_dataset_returns_inventory_and_csv_profiles() -> None:
     response_body = response.text
     assert "alice@example.com" not in response_body
     assert "bob@example.com" not in response_body
+
+
+def test_recommendations_endpoint_returns_structured_agent_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_generate_recommendations(inspection: object) -> RecommendationResponse:
+        assert getattr(inspection, "summary").dataset_name == "soil-study"
+        return RecommendationResponse.model_validate(
+            {
+                "recommendations": [
+                    {
+                        "related_finding": {
+                            "type": "duplicate_rows",
+                            "file": "observations.csv",
+                            "affected_column": None,
+                        },
+                        "short_title": "Review duplicate observation",
+                        "rationale": "A duplicate row can distort analysis.",
+                        "proposed_action": "Verify the row before removing a copy.",
+                        "confidence": 0.95,
+                        "human_approval_required": True,
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr(
+        "app.routes.inspect.generate_recommendations",
+        fake_generate_recommendations,
+    )
+
+    response = client.post("/api/inspect/sample-dataset/recommendations")
+
+    assert response.status_code == 200
+    assert response.json()["recommendations"][0] == {
+        "related_finding": {
+            "type": "duplicate_rows",
+            "file": "observations.csv",
+            "affected_column": None,
+        },
+        "short_title": "Review duplicate observation",
+        "rationale": "A duplicate row can distort analysis.",
+        "proposed_action": "Verify the row before removing a copy.",
+        "confidence": 0.95,
+        "human_approval_required": True,
+    }
+
+
+def test_recommendations_endpoint_reports_missing_ai_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("DATAQUAY_AI_MODEL", raising=False)
+
+    response = client.post("/api/inspect/sample-dataset/recommendations")
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": (
+            "DATAQUAY_AI_MODEL is not configured; set it to a "
+            "PydanticAI provider-qualified model name."
+        )
+    }

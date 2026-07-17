@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class CsvProfile(BaseModel):
@@ -73,3 +73,22 @@ class DatasetInspection(BaseModel):
     readiness: ReadinessSummary
     files: list[InspectedFile]
     findings: list[InspectionFinding]
+
+
+class FindingReference(BaseModel):
+    type: FindingType
+    file: str
+    affected_column: str | None
+
+
+class RemediationRecommendation(BaseModel):
+    related_finding: FindingReference
+    short_title: str = Field(min_length=1, max_length=120)
+    rationale: str = Field(min_length=1)
+    proposed_action: str = Field(min_length=1)
+    confidence: float = Field(ge=0, le=1)
+    human_approval_required: bool
+
+
+class RecommendationResponse(BaseModel):
+    recommendations: list[RemediationRecommendation]
