@@ -17,7 +17,7 @@ const initialState: RecommendationActionState = {
 
 type RecommendationDecision = "pending" | "approved" | "rejected";
 
-export function RecommendationsPanel() {
+export function RecommendationsPanel({ datasetId }: { datasetId?: string }) {
   const [state, formAction, pending] = useActionState(
     generateRecommendations,
     initialState,
@@ -35,6 +35,9 @@ export function RecommendationsPanel() {
           </p>
         </div>
         <form action={formAction}>
+          {datasetId ? (
+            <input name="dataset_id" type="hidden" value={datasetId} />
+          ) : null}
           <button
             className="generate-button"
             disabled={pending}
@@ -75,6 +78,7 @@ export function RecommendationsPanel() {
           <RecommendationEmpty />
         ) : (
           <RecommendationReview
+            datasetId={datasetId}
             key={state.generation}
             recommendations={state.recommendations}
           />
@@ -86,8 +90,10 @@ export function RecommendationsPanel() {
 
 function RecommendationReview({
   recommendations,
+  datasetId,
 }: {
   recommendations: RemediationRecommendation[];
+  datasetId?: string;
 }) {
   const [decisions, setDecisions] = useState<
     Record<string, RecommendationDecision>
@@ -132,7 +138,10 @@ function RecommendationReview({
         ))}
       </div>
 
-      <ApprovedRemediationPlan items={approvedRecommendations} />
+      <ApprovedRemediationPlan
+        datasetId={datasetId}
+        items={approvedRecommendations}
+      />
     </div>
   );
 }
@@ -341,12 +350,14 @@ function RecommendationCard({
 
 function ApprovedRemediationPlan({
   items,
+  datasetId,
 }: {
   items: Array<{
     id: string;
     recommendation: RemediationRecommendation;
     index: number;
   }>;
+  datasetId?: string;
 }) {
   return (
     <section className="approved-plan" aria-labelledby="approved-plan-title">
@@ -387,6 +398,7 @@ function ApprovedRemediationPlan({
 
       <RemediationWorkflow
         approvedRecommendations={items.map((item) => item.recommendation)}
+        datasetId={datasetId}
         key={items.map((item) => item.id).join("|") || "no-approvals"}
       />
     </section>

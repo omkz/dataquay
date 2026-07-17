@@ -198,7 +198,7 @@ export function DatasetOverview({
           </div>
         </section>
 
-        {mode === "sample" ? <RecommendationsPanel /> : null}
+        <RecommendationsPanel datasetId={datasetId} />
       </main>
 
       <footer className="site-footer">

@@ -32,6 +32,9 @@ def generate_dataset_package(
     source_directory: str | Path,
     working_copy_directory: str | Path,
     package_directory: str | Path,
+    *,
+    dataset_name: str | None = None,
+    download_url: str = PACKAGE_DOWNLOAD_URL,
 ) -> PackageGenerationResult:
     """Build a deterministic package without modifying source or working files."""
     source_root = Path(source_directory).resolve(strict=True)
@@ -55,12 +58,13 @@ def generate_dataset_package(
         )
 
     source_inspection = inspect_dataset(source_root)
+    resolved_dataset_name = dataset_name or source_inspection.summary.dataset_name
     inspection = inspect_dataset(working_root)
     inspection = inspection.model_copy(
         update={
             "summary": inspection.summary.model_copy(
                 update={
-                    "dataset_name": source_inspection.summary.dataset_name,
+                    "dataset_name": resolved_dataset_name,
                 }
             )
         }
@@ -96,7 +100,7 @@ def generate_dataset_package(
         zip_file_name=zip_path.name,
         zip_size_bytes=zip_path.stat().st_size,
         zip_checksum_sha256=calculate_file_checksum(zip_path),
-        download_url=PACKAGE_DOWNLOAD_URL,
+        download_url=download_url,
         files=_package_file_entries(package_root),
         readiness=validation.readiness,
     )

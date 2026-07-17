@@ -2,6 +2,7 @@
 
 import {
   getBackendUrl,
+  isDatasetIdentifier,
   isRecommendationResponse,
   type RecommendationActionState,
 } from "@/lib/dataquay";
@@ -10,11 +11,26 @@ export async function generateRecommendations(
   previousState: RecommendationActionState,
   formData: FormData,
 ): Promise<RecommendationActionState> {
-  void formData;
+  const datasetIdValue = formData.get("dataset_id");
+  const datasetId =
+    typeof datasetIdValue === "string" && datasetIdValue
+      ? datasetIdValue
+      : undefined;
+  if (datasetId && !isDatasetIdentifier(datasetId)) {
+    return {
+      status: "error",
+      recommendations: [],
+      generation: previousState.generation,
+      message: "The uploaded dataset identifier is invalid. Upload it again to continue.",
+    };
+  }
+  const recommendationPath = datasetId
+    ? `/api/inspect/datasets/${encodeURIComponent(datasetId)}/recommendations`
+    : "/api/inspect/sample-dataset/recommendations";
 
   try {
     const response = await fetch(
-      `${getBackendUrl()}/api/inspect/sample-dataset/recommendations`,
+      `${getBackendUrl()}${recommendationPath}`,
       {
         method: "POST",
         cache: "no-store",

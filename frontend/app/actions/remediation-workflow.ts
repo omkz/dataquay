@@ -16,6 +16,7 @@ import {
 
 export async function previewApprovedRemediation(
   approvedRecommendations: RemediationRecommendation[],
+  datasetId?: string,
 ): Promise<WorkflowActionResult<RemediationPreviewResponse>> {
   if (approvedRecommendations.length === 0) {
     return prerequisiteError(
@@ -23,7 +24,7 @@ export async function previewApprovedRemediation(
     );
   }
   return postWorkflowEndpoint(
-    "/api/remediate/sample-dataset/preview",
+    workflowPath(datasetId, "/api/remediate/sample-dataset/preview", "remediate", "preview"),
     { approved_recommendations: approvedRecommendations },
     isRemediationPreviewResponse,
     "remediation preview",
@@ -32,6 +33,7 @@ export async function previewApprovedRemediation(
 
 export async function applyApprovedRemediation(
   approvedRecommendations: RemediationRecommendation[],
+  datasetId?: string,
 ): Promise<WorkflowActionResult<RemediationApplyResponse>> {
   if (approvedRecommendations.length === 0) {
     return prerequisiteError(
@@ -39,33 +41,44 @@ export async function applyApprovedRemediation(
     );
   }
   return postWorkflowEndpoint(
-    "/api/remediate/sample-dataset/apply",
+    workflowPath(datasetId, "/api/remediate/sample-dataset/apply", "remediate", "apply"),
     { approved_recommendations: approvedRecommendations },
     isRemediationApplyResponse,
     "remediation apply",
   );
 }
 
-export async function validateAppliedRemediation(): Promise<
+export async function validateAppliedRemediation(datasetId?: string): Promise<
   WorkflowActionResult<DatasetValidationResult>
 > {
   return postWorkflowEndpoint(
-    "/api/validate/sample-dataset",
+    workflowPath(datasetId, "/api/validate/sample-dataset", "validate"),
     undefined,
     isDatasetValidationResult,
     "validation",
   );
 }
 
-export async function generateFinalPackage(): Promise<
+export async function generateFinalPackage(datasetId?: string): Promise<
   WorkflowActionResult<PackageGenerationResult>
 > {
   return postWorkflowEndpoint(
-    "/api/package/sample-dataset",
+    workflowPath(datasetId, "/api/package/sample-dataset", "package"),
     undefined,
     isPackageGenerationResult,
     "package generation",
   );
+}
+
+function workflowPath(
+  datasetId: string | undefined,
+  samplePath: string,
+  resource: "remediate" | "validate" | "package",
+  operation?: "preview" | "apply",
+) {
+  if (!datasetId) return samplePath;
+  const base = `/api/${resource}/datasets/${encodeURIComponent(datasetId)}`;
+  return operation ? `${base}/${operation}` : base;
 }
 
 async function postWorkflowEndpoint<T>(

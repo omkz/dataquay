@@ -29,8 +29,10 @@ const idleState = { status: "idle" } as const;
 
 export function RemediationWorkflow({
   approvedRecommendations,
+  datasetId,
 }: {
   approvedRecommendations: RemediationRecommendation[];
+  datasetId?: string;
 }) {
   const [preview, setPreview] = useState<StepState<RemediationPreviewResponse>>(
     idleState,
@@ -63,7 +65,10 @@ export function RemediationWorkflow({
     setPackageResult(idleState);
     setActiveStep("preview");
     startTransition(async () => {
-      const result = await previewApprovedRemediation(approvedRecommendations);
+      const result = await previewApprovedRemediation(
+        approvedRecommendations,
+        datasetId,
+      );
       setPreview(
         result.ok
           ? { status: "success", data: result.data }
@@ -82,7 +87,10 @@ export function RemediationWorkflow({
     setPackageResult(idleState);
     setActiveStep("apply");
     startTransition(async () => {
-      const result = await applyApprovedRemediation(approvedRecommendations);
+      const result = await applyApprovedRemediation(
+        approvedRecommendations,
+        datasetId,
+      );
       setApplication(
         result.ok
           ? { status: "success", data: result.data }
@@ -100,7 +108,7 @@ export function RemediationWorkflow({
     setPackageResult(idleState);
     setActiveStep("validate");
     startTransition(async () => {
-      const result = await validateAppliedRemediation();
+      const result = await validateAppliedRemediation(datasetId);
       setValidation(
         result.ok
           ? { status: "success", data: result.data }
@@ -117,7 +125,7 @@ export function RemediationWorkflow({
   function runPackageGeneration() {
     setActiveStep("package");
     startTransition(async () => {
-      const result = await generateFinalPackage();
+      const result = await generateFinalPackage(datasetId);
       setPackageResult(
         result.ok
           ? { status: "success", data: result.data }
@@ -136,7 +144,9 @@ export function RemediationWorkflow({
       <div className="workflow-heading">
         <div>
           <p className="section-kicker">Controlled execution</p>
-          <h3 id="workflow-title">Sample dataset workflow</h3>
+          <h3 id="workflow-title">
+            {datasetId ? "Uploaded dataset workflow" : "Sample dataset workflow"}
+          </h3>
           <p>
             Each stage runs only when you select it. Safe changes are applied to
             a separate working copy; original files remain unchanged.
@@ -248,7 +258,10 @@ export function RemediationWorkflow({
           {packageResult.status === "error" ? (
             <WorkflowError state={packageResult} />
           ) : packageResult.status === "success" ? (
-            <PackageResult packageResult={packageResult.data} />
+            <PackageResult
+              datasetId={datasetId}
+              packageResult={packageResult.data}
+            />
           ) : null}
         </WorkflowStepCard>
       </div>
@@ -563,8 +576,10 @@ function FindingOutcomeGroup({
 
 function PackageResult({
   packageResult,
+  datasetId,
 }: {
   packageResult: PackageGenerationResult;
+  datasetId?: string;
 }) {
   const [downloadState, setDownloadState] = useState<
     { status: "idle" | "pending" | "error"; message?: string }
@@ -573,7 +588,10 @@ function PackageResult({
   async function downloadPackage() {
     setDownloadState({ status: "pending" });
     try {
-      const response = await fetch("/api/sample-package", { cache: "no-store" });
+      const downloadPath = datasetId
+        ? `/api/datasets/${encodeURIComponent(datasetId)}/package`
+        : "/api/sample-package";
+      const response = await fetch(downloadPath, { cache: "no-store" });
       if (!response.ok) {
         const payload: unknown = await response.json().catch(() => null);
         const detail =

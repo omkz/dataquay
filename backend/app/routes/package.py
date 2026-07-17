@@ -4,6 +4,8 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
 from app.schemas import PackageGenerationResult
+from app.services.dataset_workspace import DatasetNotFoundError
+from app.services.dataset_workflow import resolve_dataset_workflow_workspace
 from app.services.package_generator import (
     PackageGenerationError,
     generate_dataset_package,
@@ -51,6 +53,51 @@ def download_sample_dataset_package() -> FileResponse:
         raise HTTPException(
             status_code=404,
             detail="The sample dataset package has not been generated yet.",
+        )
+    return FileResponse(
+        zip_path,
+        media_type="application/zip",
+        filename=zip_path.name,
+    )
+
+
+@router.post(
+    "/datasets/{dataset_id}",
+    response_model=PackageGenerationResult,
+)
+def generate_uploaded_dataset_package(
+    dataset_id: str,
+) -> PackageGenerationResult:
+    try:
+        workflow = resolve_dataset_workflow_workspace(dataset_id)
+        return generate_dataset_package(
+            workflow.source_directory,
+            workflow.working_copy_directory,
+            workflow.package_directory,
+            dataset_name=workflow.dataset_name,
+            download_url=workflow.package_download_url,
+        )
+    except DatasetNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PackageGenerationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/datasets/{dataset_id}/download", response_class=FileResponse)
+def download_uploaded_dataset_package(dataset_id: str) -> FileResponse:
+    try:
+        workflow = resolve_dataset_workflow_workspace(dataset_id)
+    except DatasetNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    zip_path = get_package_zip_path(workflow.package_directory)
+    if not zip_path.is_file():
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "The dataset package has not been generated yet; complete "
+                "remediation and validation before downloading."
+            ),
         )
     return FileResponse(
         zip_path,
