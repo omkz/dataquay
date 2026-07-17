@@ -48,6 +48,17 @@ export type DatasetInspection = {
   findings: InspectionFinding[];
 };
 
+export type DatasetUploadResponse = {
+  dataset_id: string;
+  file_name: string;
+  dataset_name: string;
+  archive_size_bytes: number;
+  archive_checksum_sha256: string;
+  extracted_file_count: number;
+  extracted_size_bytes: number;
+  inspection_url: string;
+};
+
 export type FindingReference = {
   type: string;
   file: string;
@@ -159,10 +170,46 @@ export function getBackendUrl() {
 }
 
 export async function getSampleDatasetInspection(): Promise<InspectionResult> {
+  return getDatasetInspection("/api/inspect/sample-dataset");
+}
+
+export async function getUploadedDatasetInspection(
+  datasetId: string,
+): Promise<InspectionResult> {
+  if (!isDatasetIdentifier(datasetId)) {
+    return {
+      ok: false,
+      message:
+        "The dataset identifier is invalid. Upload the dataset again to create a new workspace.",
+    };
+  }
+  return getDatasetInspection(
+    `/api/inspect/datasets/${encodeURIComponent(datasetId)}`,
+  );
+}
+
+export function isDatasetUploadResponse(
+  value: unknown,
+): value is DatasetUploadResponse {
+  return Boolean(
+    isRecord(value) &&
+      typeof value.dataset_id === "string" &&
+      isDatasetIdentifier(value.dataset_id) &&
+      typeof value.file_name === "string" &&
+      typeof value.dataset_name === "string" &&
+      typeof value.archive_size_bytes === "number" &&
+      typeof value.archive_checksum_sha256 === "string" &&
+      typeof value.extracted_file_count === "number" &&
+      typeof value.extracted_size_bytes === "number" &&
+      typeof value.inspection_url === "string",
+  );
+}
+
+async function getDatasetInspection(path: string): Promise<InspectionResult> {
   const backendUrl = getBackendUrl();
 
   try {
-    const response = await fetch(`${backendUrl}/api/inspect/sample-dataset`, {
+    const response = await fetch(`${backendUrl}${path}`, {
       cache: "no-store",
       headers: { Accept: "application/json" },
     });
@@ -191,6 +238,12 @@ export async function getSampleDatasetInspection(): Promise<InspectionResult> {
         "DataQuay could not reach the inspection API. Confirm that the backend is running and the backend URL is correct.",
     };
   }
+}
+
+function isDatasetIdentifier(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+    value,
+  );
 }
 
 export function isRecommendationResponse(

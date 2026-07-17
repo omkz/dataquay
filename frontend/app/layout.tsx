@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Dataset Overview | DataQuay",
-  description: "Deterministic stewardship findings for the DataQuay sample dataset.",
+  title: "DataQuay | Research Data Stewardship",
+  description: "Upload and inspect research datasets with deterministic stewardship checks.",
 };
 
 export default function RootLayout({

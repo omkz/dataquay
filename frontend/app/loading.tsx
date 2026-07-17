@@ -13,7 +13,7 @@ export default function Loading() {
           <span className="skeleton skeleton-card" />
           <span className="skeleton skeleton-card" />
         </div>
-        <p className="loading-message">Inspecting the sample dataset…</p>
+        <p className="loading-message">Loading dataset inspection…</p>
       </div>
     </main>
   );

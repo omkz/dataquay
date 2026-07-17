@@ -18,8 +18,12 @@ const severityOrder = ["critical", "high", "medium", "low", "informational"];
 
 export function DatasetOverview({
   inspection,
+  mode,
+  datasetId,
 }: {
   inspection: DatasetInspection;
+  mode: "sample" | "uploaded";
+  datasetId?: string;
 }) {
   const { summary, readiness, files, findings } = inspection;
   const nonCsvFileCount = summary.total_file_count - summary.csv_file_count;
@@ -40,7 +44,12 @@ export function DatasetOverview({
             <small>Research data stewardship</small>
           </span>
         </Link>
-        <span className="environment-pill">Sample dataset</span>
+        <div className="header-actions">
+          <Link className="header-link" href="/">Upload another</Link>
+          <span className="environment-pill">
+            {mode === "sample" ? "Sample demo" : "Uploaded dataset"}
+          </span>
+        </div>
       </header>
 
       <main className="overview-main">
@@ -49,13 +58,13 @@ export function DatasetOverview({
             <p className="eyebrow">Dataset inspection</p>
             <h1 id="dataset-title">{formatLabel(summary.dataset_name)}</h1>
             <p className="heading-copy">
-              Deterministic inspection results for the complete sample dataset.
+              Deterministic inspection results for the complete {mode === "sample" ? "sample dataset" : "uploaded dataset"}.
               Original source files remain unchanged.
             </p>
           </div>
           <div className="dataset-path">
-            <span>Dataset</span>
-            <code>{summary.dataset_name}</code>
+            <span>{datasetId ? "Dataset ID" : "Dataset"}</span>
+            <code>{datasetId ?? summary.dataset_name}</code>
           </div>
         </section>
 
@@ -94,7 +103,7 @@ export function DatasetOverview({
           <SummaryCard
             label="Files inventoried"
             value={summary.total_file_count}
-            detail="Across the sample directory"
+            detail={mode === "sample" ? "Across the sample directory" : "Across extracted originals"}
           />
           <SummaryCard
             label="CSV profiles"
@@ -119,15 +128,21 @@ export function DatasetOverview({
             </span>
           </div>
           <div className="severity-grid">
-            {severityEntries.map(([severity, count]) => (
-              <div className="severity-card" key={severity}>
-                <span className={`severity-dot severity-${severity}`} />
-                <div>
-                  <strong>{count}</strong>
-                  <span>{formatLabel(severity)}</span>
+            {severityEntries.length > 0 ? (
+              severityEntries.map(([severity, count]) => (
+                <div className="severity-card" key={severity}>
+                  <span className={`severity-dot severity-${severity}`} />
+                  <div>
+                    <strong>{count}</strong>
+                    <span>{formatLabel(severity)}</span>
+                  </div>
                 </div>
+              ))
+            ) : (
+              <div className="empty-dashboard-state">
+                No findings were detected in this dataset.
               </div>
-            ))}
+            )}
           </div>
         </section>
 
@@ -167,22 +182,28 @@ export function DatasetOverview({
             <span className="section-meta">Deterministic rules</span>
           </div>
           <div className="findings-list">
-            {findings.map((finding, index) => (
-              <FindingCard
-                finding={finding}
-                index={index + 1}
-                key={`${finding.type}-${finding.file}-${finding.affected_column ?? "file"}`}
-              />
-            ))}
+            {findings.length > 0 ? (
+              findings.map((finding, index) => (
+                <FindingCard
+                  finding={finding}
+                  index={index + 1}
+                  key={`${finding.type}-${finding.file}-${finding.affected_column ?? "file"}`}
+                />
+              ))
+            ) : (
+              <div className="empty-dashboard-state">
+                No structured findings to review.
+              </div>
+            )}
           </div>
         </section>
 
-        <RecommendationsPanel />
+        {mode === "sample" ? <RecommendationsPanel /> : null}
       </main>
 
       <footer className="site-footer">
         <span>DataQuay deterministic inspection</span>
-        <span>Sample data · Read only</span>
+        <span>{mode === "sample" ? "Sample demo" : "Uploaded originals"} · Read only</span>
       </footer>
     </div>
   );
