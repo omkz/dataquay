@@ -1,5 +1,14 @@
 export type ReadinessStatus = "not_ready" | "needs_review" | "ready";
 
+export type ReadinessSummary = {
+  total_finding_count: number;
+  finding_counts_by_severity: Record<string, number>;
+  finding_counts_by_type: Record<string, number>;
+  blocker_count: number;
+  human_review_required: boolean;
+  status: ReadinessStatus;
+};
+
 export type CsvProfile = {
   file_name: string;
   row_count: number;
@@ -34,24 +43,19 @@ export type DatasetInspection = {
     csv_file_count: number;
     total_size_bytes: number;
   };
-  readiness: {
-    total_finding_count: number;
-    finding_counts_by_severity: Record<string, number>;
-    finding_counts_by_type: Record<string, number>;
-    blocker_count: number;
-    human_review_required: boolean;
-    status: ReadinessStatus;
-  };
+  readiness: ReadinessSummary;
   files: InspectedFile[];
   findings: InspectionFinding[];
 };
 
+export type FindingReference = {
+  type: string;
+  file: string;
+  affected_column: string | null;
+};
+
 export type RemediationRecommendation = {
-  related_finding: {
-    type: string;
-    file: string;
-    affected_column: string | null;
-  };
+  related_finding: FindingReference;
   short_title: string;
   rationale: string;
   proposed_action: string;
@@ -65,6 +69,81 @@ export type RecommendationActionState = {
   generation: number;
   message?: string;
 };
+
+export type RemediationAction = {
+  related_finding: FindingReference;
+  target_file: string;
+  target_column: string | null;
+  proposed_operation: string;
+  can_apply_automatically: boolean;
+  manual_review_reason: string | null;
+  expected_result: string;
+};
+
+export type RemediationPreviewResponse = {
+  actions: RemediationAction[];
+};
+
+export type RemediationActionResult = {
+  action: RemediationAction;
+  source_checksum_sha256: string;
+  output_checksum_sha256: string | null;
+  message: string;
+};
+
+export type FileChecksumRecord = {
+  relative_path: string;
+  source_checksum_sha256: string;
+  output_checksum_sha256: string;
+};
+
+export type RemediationApplyResponse = {
+  working_copy_directory: string;
+  applied_actions: RemediationActionResult[];
+  skipped_actions: RemediationActionResult[];
+  failed_actions: RemediationActionResult[];
+  file_checksums: FileChecksumRecord[];
+};
+
+export type FileChecksumVerification = {
+  relative_path: string;
+  expected_source_checksum_sha256: string | null;
+  actual_source_checksum_sha256: string | null;
+  source_checksum_verified: boolean;
+  expected_output_checksum_sha256: string | null;
+  actual_output_checksum_sha256: string | null;
+  output_checksum_verified: boolean;
+};
+
+export type DatasetValidationResult = {
+  resolved_findings: InspectionFinding[];
+  remaining_findings: InspectionFinding[];
+  checksum_verifications: FileChecksumVerification[];
+  source_checksums_verified: boolean;
+  output_checksums_verified: boolean;
+  original_files_unchanged: boolean;
+  readiness: ReadinessSummary;
+};
+
+export type PackageFileEntry = {
+  relative_path: string;
+  size_bytes: number;
+  checksum_sha256: string;
+};
+
+export type PackageGenerationResult = {
+  dataset_name: string;
+  zip_file_name: string;
+  zip_size_bytes: number;
+  zip_checksum_sha256: string;
+  download_url: string;
+  files: PackageFileEntry[];
+  readiness: ReadinessSummary;
+};
+
+export type WorkflowActionResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; message: string; prerequisite: boolean };
 
 export type InspectionResult =
   | { ok: true; data: DatasetInspection }
@@ -128,6 +207,69 @@ export function isRecommendationResponse(
   );
 }
 
+export function isRemediationPreviewResponse(
+  value: unknown,
+): value is RemediationPreviewResponse {
+  if (!isRecord(value) || !Array.isArray(value.actions)) {
+    return false;
+  }
+  return value.actions.every(isRemediationAction);
+}
+
+export function isRemediationApplyResponse(
+  value: unknown,
+): value is RemediationApplyResponse {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    typeof value.working_copy_directory === "string" &&
+    isActionResultArray(value.applied_actions) &&
+    isActionResultArray(value.skipped_actions) &&
+    isActionResultArray(value.failed_actions) &&
+    Array.isArray(value.file_checksums) &&
+    value.file_checksums.every(isFileChecksumRecord)
+  );
+}
+
+export function isDatasetValidationResult(
+  value: unknown,
+): value is DatasetValidationResult {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    Array.isArray(value.resolved_findings) &&
+    value.resolved_findings.every(isInspectionFinding) &&
+    Array.isArray(value.remaining_findings) &&
+    value.remaining_findings.every(isInspectionFinding) &&
+    Array.isArray(value.checksum_verifications) &&
+    value.checksum_verifications.every(isChecksumVerification) &&
+    typeof value.source_checksums_verified === "boolean" &&
+    typeof value.output_checksums_verified === "boolean" &&
+    typeof value.original_files_unchanged === "boolean" &&
+    isReadinessSummary(value.readiness)
+  );
+}
+
+export function isPackageGenerationResult(
+  value: unknown,
+): value is PackageGenerationResult {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    typeof value.dataset_name === "string" &&
+    typeof value.zip_file_name === "string" &&
+    typeof value.zip_size_bytes === "number" &&
+    typeof value.zip_checksum_sha256 === "string" &&
+    typeof value.download_url === "string" &&
+    Array.isArray(value.files) &&
+    value.files.every(isPackageFileEntry) &&
+    isReadinessSummary(value.readiness)
+  );
+}
+
 function isRemediationRecommendation(
   value: unknown,
 ): value is RemediationRecommendation {
@@ -149,6 +291,109 @@ function isRemediationRecommendation(
       typeof candidate.confidence === "number" &&
       typeof candidate.human_approval_required === "boolean",
   );
+}
+
+function isRemediationAction(value: unknown): value is RemediationAction {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return Boolean(
+    isFindingReference(value.related_finding) &&
+      typeof value.target_file === "string" &&
+      (typeof value.target_column === "string" || value.target_column === null) &&
+      typeof value.proposed_operation === "string" &&
+      typeof value.can_apply_automatically === "boolean" &&
+      (typeof value.manual_review_reason === "string" ||
+        value.manual_review_reason === null) &&
+      typeof value.expected_result === "string",
+  );
+}
+
+function isActionResultArray(value: unknown): value is RemediationActionResult[] {
+  return Array.isArray(value) && value.every(isRemediationActionResult);
+}
+
+function isRemediationActionResult(
+  value: unknown,
+): value is RemediationActionResult {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    isRemediationAction(value.action) &&
+    typeof value.source_checksum_sha256 === "string" &&
+    (typeof value.output_checksum_sha256 === "string" ||
+      value.output_checksum_sha256 === null) &&
+    typeof value.message === "string"
+  );
+}
+
+function isFileChecksumRecord(value: unknown): value is FileChecksumRecord {
+  return Boolean(
+    isRecord(value) &&
+      typeof value.relative_path === "string" &&
+      typeof value.source_checksum_sha256 === "string" &&
+      typeof value.output_checksum_sha256 === "string",
+  );
+}
+
+function isChecksumVerification(
+  value: unknown,
+): value is FileChecksumVerification {
+  return Boolean(
+    isRecord(value) &&
+      typeof value.relative_path === "string" &&
+      typeof value.source_checksum_verified === "boolean" &&
+      typeof value.output_checksum_verified === "boolean",
+  );
+}
+
+function isPackageFileEntry(value: unknown): value is PackageFileEntry {
+  return Boolean(
+    isRecord(value) &&
+      typeof value.relative_path === "string" &&
+      typeof value.size_bytes === "number" &&
+      typeof value.checksum_sha256 === "string",
+  );
+}
+
+function isFindingReference(value: unknown): value is FindingReference {
+  return Boolean(
+    isRecord(value) &&
+      typeof value.type === "string" &&
+      typeof value.file === "string" &&
+      (typeof value.affected_column === "string" ||
+        value.affected_column === null),
+  );
+}
+
+function isInspectionFinding(value: unknown): value is InspectionFinding {
+  return Boolean(
+    isRecord(value) &&
+      typeof value.type === "string" &&
+      typeof value.severity === "string" &&
+      typeof value.file === "string" &&
+      (typeof value.affected_column === "string" ||
+        value.affected_column === null) &&
+      isRecord(value.evidence) &&
+      typeof value.message === "string",
+  );
+}
+
+function isReadinessSummary(value: unknown): value is ReadinessSummary {
+  return Boolean(
+    isRecord(value) &&
+      typeof value.total_finding_count === "number" &&
+      typeof value.blocker_count === "number" &&
+      typeof value.human_review_required === "boolean" &&
+      ["not_ready", "needs_review", "ready"].includes(String(value.status)) &&
+      isRecord(value.finding_counts_by_severity) &&
+      isRecord(value.finding_counts_by_type),
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object");
 }
 
 function isDatasetInspection(value: unknown): value is DatasetInspection {

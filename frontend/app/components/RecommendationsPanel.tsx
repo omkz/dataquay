@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 
 import { generateRecommendations } from "@/app/actions/recommendations";
+import { RemediationWorkflow } from "@/app/components/RemediationWorkflow";
 import type {
   RecommendationActionState,
   RemediationRecommendation,
@@ -383,6 +384,11 @@ function ApprovedRemediationPlan({
           ))}
         </div>
       )}
+
+      <RemediationWorkflow
+        approvedRecommendations={items.map((item) => item.recommendation)}
+        key={items.map((item) => item.id).join("|") || "no-approvals"}
+      />
     </section>
   );
 }
