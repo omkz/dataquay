@@ -7,9 +7,11 @@ from tempfile import NamedTemporaryFile
 import polars as pl
 
 from app.schemas import (
+    FileChecksumRecord,
     RemediationAction,
     RemediationActionResult,
     RemediationApplyResponse,
+    RemediationChecksumManifest,
     RemediationOperation,
     RemediationRecommendation,
 )
@@ -37,6 +39,7 @@ def apply_approved_remediation_actions(
         approved_recommendations,
         inspection.findings,
     )
+    get_checksum_manifest_path(working_root).unlink(missing_ok=True)
     _refresh_working_copy(source_root, working_root)
 
     applied_actions: list[RemediationActionResult] = []
@@ -88,11 +91,22 @@ def apply_approved_remediation_actions(
             )
         )
 
+    file_checksums = _build_file_checksum_records(source_root, working_root)
+    _write_checksum_manifest(
+        RemediationChecksumManifest(
+            source_directory=str(source_root),
+            working_copy_directory=str(working_root),
+            files=file_checksums,
+        ),
+        get_checksum_manifest_path(working_root),
+    )
+
     return RemediationApplyResponse(
         working_copy_directory=str(working_root),
         applied_actions=applied_actions,
         skipped_actions=skipped_actions,
         failed_actions=failed_actions,
+        file_checksums=file_checksums,
     )
 
 
@@ -103,6 +117,11 @@ def calculate_file_checksum(file_path: str | Path) -> str:
         for chunk in iter(lambda: file.read(64 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def get_checksum_manifest_path(working_copy_directory: str | Path) -> Path:
+    working_root = Path(working_copy_directory).resolve()
+    return working_root.parent / f"{working_root.name}.checksums.json"
 
 
 def _validate_working_copy_path(source_root: Path, working_root: Path) -> None:
@@ -130,6 +149,24 @@ def _resolve_dataset_file(dataset_root: Path, relative_path: str) -> Path:
     if dataset_root not in file_path.parents or not file_path.is_file():
         raise ValueError(f"Target file is outside the dataset: '{relative_path}'.")
     return file_path
+
+
+def _build_file_checksum_records(
+    source_root: Path,
+    working_root: Path,
+) -> list[FileChecksumRecord]:
+    records: list[FileChecksumRecord] = []
+    for source_file in sorted(path for path in source_root.rglob("*") if path.is_file()):
+        relative_path = source_file.relative_to(source_root)
+        output_file = _resolve_dataset_file(working_root, relative_path.as_posix())
+        records.append(
+            FileChecksumRecord(
+                relative_path=relative_path.as_posix(),
+                source_checksum_sha256=calculate_file_checksum(source_file),
+                output_checksum_sha256=calculate_file_checksum(output_file),
+            )
+        )
+    return records
 
 
 def _apply_automatic_action(action: RemediationAction, output_file: Path) -> None:
@@ -180,6 +217,29 @@ def _write_csv_atomically(data: pl.DataFrame, output_file: Path) -> None:
             temporary_path = Path(temporary_file.name)
         data.write_csv(temporary_path)
         temporary_path.replace(output_file)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+
+
+def _write_checksum_manifest(
+    manifest: RemediationChecksumManifest,
+    manifest_path: Path,
+) -> None:
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            dir=manifest_path.parent,
+            prefix=f".{manifest_path.name}.",
+            suffix=".tmp",
+            mode="w",
+            encoding="utf-8",
+            delete=False,
+        ) as temporary_file:
+            temporary_path = Path(temporary_file.name)
+            temporary_file.write(manifest.model_dump_json(indent=2))
+        temporary_path.replace(manifest_path)
     finally:
         if temporary_path is not None:
             temporary_path.unlink(missing_ok=True)

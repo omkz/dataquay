@@ -8,6 +8,7 @@ from app.services.remediation_apply import (
     InvalidWorkingCopyPathError,
     apply_approved_remediation_actions,
     calculate_file_checksum,
+    get_checksum_manifest_path,
 )
 
 SAMPLE_DATASET_PATH = (
@@ -86,6 +87,12 @@ def test_apply_uses_a_repeatable_working_copy_and_preserves_originals(
     assert len(first_result.applied_actions) == 3
     assert len(first_result.skipped_actions) == 2
     assert first_result.failed_actions == []
+    assert [record.relative_path for record in first_result.file_checksums] == [
+        "README.md",
+        "observations.csv",
+        "participants.csv",
+    ]
+    assert get_checksum_manifest_path(working_copy).is_file()
     assert all(
         result.action.can_apply_automatically
         for result in first_result.applied_actions
@@ -134,6 +141,14 @@ def test_apply_uses_a_repeatable_working_copy_and_preserves_originals(
         )
         assert result.output_checksum_sha256 is not None
         assert len(result.output_checksum_sha256) == 64
+
+    for record in first_result.file_checksums:
+        assert record.source_checksum_sha256 == calculate_file_checksum(
+            SAMPLE_DATASET_PATH / record.relative_path
+        )
+        assert record.output_checksum_sha256 == calculate_file_checksum(
+            working_copy / record.relative_path
+        )
 
     first_working_contents = _directory_contents(working_copy)
     second_result = apply_approved_remediation_actions(

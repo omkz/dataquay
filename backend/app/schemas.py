@@ -129,8 +129,41 @@ class RemediationActionResult(BaseModel):
     message: str
 
 
+class FileChecksumRecord(BaseModel):
+    relative_path: str
+    source_checksum_sha256: str
+    output_checksum_sha256: str
+
+
+class RemediationChecksumManifest(BaseModel):
+    source_directory: str
+    working_copy_directory: str
+    files: list[FileChecksumRecord]
+
+
 class RemediationApplyResponse(BaseModel):
     working_copy_directory: str
     applied_actions: list[RemediationActionResult]
     skipped_actions: list[RemediationActionResult]
     failed_actions: list[RemediationActionResult]
+    file_checksums: list[FileChecksumRecord]
+
+
+class FileChecksumVerification(BaseModel):
+    relative_path: str
+    expected_source_checksum_sha256: str | None
+    actual_source_checksum_sha256: str | None
+    source_checksum_verified: bool
+    expected_output_checksum_sha256: str | None
+    actual_output_checksum_sha256: str | None
+    output_checksum_verified: bool
+
+
+class DatasetValidationResult(BaseModel):
+    resolved_findings: list[InspectionFinding]
+    remaining_findings: list[InspectionFinding]
+    checksum_verifications: list[FileChecksumVerification]
+    source_checksums_verified: bool
+    output_checksums_verified: bool
+    original_files_unchanged: bool
+    readiness: ReadinessSummary
