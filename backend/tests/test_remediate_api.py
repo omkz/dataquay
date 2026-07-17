@@ -1,6 +1,8 @@
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+import polars as pl
+import pytest
 
 from app.main import app
 
@@ -105,3 +107,77 @@ def test_preview_endpoint_rejects_a_stale_or_unknown_finding_reference() -> None
 
     assert response.status_code == 422
     assert "not present in the current inspection" in response.json()["detail"]
+
+
+def test_apply_endpoint_applies_only_safe_actions_to_a_working_copy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    working_copy = tmp_path / "api-working-copy"
+    monkeypatch.setattr(
+        "app.routes.remediate.SAMPLE_WORKING_COPY_PATH",
+        working_copy,
+    )
+    original_files = {
+        path.relative_to(SAMPLE_DATASET_PATH): path.read_bytes()
+        for path in SAMPLE_DATASET_PATH.rglob("*")
+        if path.is_file()
+    }
+    request = {
+        "approved_recommendations": [
+            _approved_recommendation(
+                "duplicate_rows",
+                "observations.csv",
+                None,
+            ),
+            _approved_recommendation(
+                "inconsistent_date_formats",
+                "observations.csv",
+                "recorded_at",
+            ),
+            _approved_recommendation(
+                "missing_reference",
+                "observations.csv",
+                "participant_id",
+            ),
+        ]
+    }
+
+    first_response = client.post(
+        "/api/remediate/sample-dataset/apply",
+        json=request,
+    )
+
+    assert first_response.status_code == 200
+    result = first_response.json()
+    assert result["working_copy_directory"] == str(working_copy.resolve())
+    assert len(result["applied_actions"]) == 2
+    assert len(result["skipped_actions"]) == 1
+    assert result["failed_actions"] == []
+    assert result["skipped_actions"][0]["action"]["proposed_operation"] == (
+        "reconcile_missing_references"
+    )
+    assert len(result["applied_actions"][0]["source_checksum_sha256"]) == 64
+    assert len(result["applied_actions"][0]["output_checksum_sha256"]) == 64
+
+    output = pl.read_csv(working_copy / "observations.csv")
+    assert output.height == 3
+    assert set(output["recorded_at"].to_list()) == {
+        "2026-02-01",
+        "2026-02-02",
+    }
+    first_output_bytes = (working_copy / "observations.csv").read_bytes()
+
+    second_response = client.post(
+        "/api/remediate/sample-dataset/apply",
+        json=request,
+    )
+
+    assert second_response.status_code == 200
+    assert second_response.json() == result
+    assert (working_copy / "observations.csv").read_bytes() == first_output_bytes
+    assert {
+        path.relative_to(SAMPLE_DATASET_PATH): path.read_bytes()
+        for path in SAMPLE_DATASET_PATH.rglob("*")
+        if path.is_file()
+    } == original_files

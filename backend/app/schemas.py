@@ -120,3 +120,17 @@ class RemediationAction(BaseModel):
 
 class RemediationPreviewResponse(BaseModel):
     actions: list[RemediationAction]
+
+
+class RemediationActionResult(BaseModel):
+    action: RemediationAction
+    source_checksum_sha256: str
+    output_checksum_sha256: str | None
+    message: str
+
+
+class RemediationApplyResponse(BaseModel):
+    working_copy_directory: str
+    applied_actions: list[RemediationActionResult]
+    skipped_actions: list[RemediationActionResult]
+    failed_actions: list[RemediationActionResult]

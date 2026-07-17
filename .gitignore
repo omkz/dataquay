@@ -16,5 +16,6 @@ node_modules/
 uploads/
 storage/
 tmp/
+backend/.dataquay/
 
 .DS_Store
