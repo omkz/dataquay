@@ -35,6 +35,7 @@ class FindingType(StrEnum):
     MISSING_REFERENCE = "missing_reference"
     INCONSISTENT_DATE_FORMATS = "inconsistent_date_formats"
     SUSPICIOUS_NUMERIC_VALUES = "suspicious_numeric_values"
+    PROBABLE_PERSONAL_DATA = "probable_personal_data"
 
 
 class FindingSeverity(StrEnum):

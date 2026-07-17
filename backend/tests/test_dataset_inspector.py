@@ -146,3 +146,54 @@ def test_inspect_dataset_detects_mixed_dates_and_suspicious_numbers(
         "occurrence_count": 2,
         "reason": "matches a common placeholder or invalid sentinel value",
     }
+
+
+def test_inspect_dataset_detects_and_masks_probable_personal_data(
+    tmp_path: Path,
+) -> None:
+    dataset_path = tmp_path / "privacy-dataset"
+    dataset_path.mkdir()
+    (dataset_path / "contacts.csv").write_text(
+        "record_id,name,contact,email\n"
+        "R001,Alice,alice@example.com,withheld\n"
+        "R002,Bob,not-an-email,unknown\n"
+        "R003,,bob@example.org,\n",
+        encoding="utf-8",
+    )
+
+    inspection = inspect_dataset(dataset_path)
+    findings = {
+        (finding.type.value, finding.affected_column): finding
+        for finding in inspection.findings
+        if finding.type.value == "probable_personal_data"
+    }
+
+    name_finding = findings[("probable_personal_data", "name")]
+    assert name_finding.severity.value == "medium"
+    assert name_finding.evidence == {
+        "category": "person_name",
+        "occurrence_count": 2,
+        "detection_methods": ["column_name"],
+        "masked_evidence": ["A****", "B**"],
+    }
+
+    email_finding = findings[("probable_personal_data", "contact")]
+    assert email_finding.evidence == {
+        "category": "email_address",
+        "occurrence_count": 2,
+        "detection_methods": ["pattern_match"],
+        "masked_evidence": ["a****@e******.com", "b**@e******.org"],
+    }
+    assert "confirmed legal classification" in email_finding.message
+
+    named_email_finding = findings[("probable_personal_data", "email")]
+    assert named_email_finding.evidence == {
+        "category": "email_address",
+        "occurrence_count": 2,
+        "detection_methods": ["column_name"],
+        "masked_evidence": ["w*******", "u******"],
+    }
+
+    serialized_inspection = inspection.model_dump_json()
+    assert "alice@example.com" not in serialized_inspection
+    assert "bob@example.org" not in serialized_inspection

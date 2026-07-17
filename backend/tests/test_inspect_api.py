@@ -102,7 +102,7 @@ def test_inspect_sample_dataset_returns_inventory_and_csv_profiles() -> None:
         (finding["type"], finding["file"], finding["affected_column"]): finding
         for finding in inspection["findings"]
     }
-    assert len(findings) == 10
+    assert len(findings) == 12
 
     assert findings[("missing_values", "participants.csv", "email")] == {
         "type": "missing_values",
@@ -171,3 +171,22 @@ def test_inspect_sample_dataset_returns_inventory_and_csv_profiles() -> None:
         "occurrence_count": 1,
         "reason": "matches a common placeholder or invalid sentinel value",
     }
+    assert findings[("probable_personal_data", "participants.csv", "name")][
+        "evidence"
+    ] == {
+        "category": "person_name",
+        "occurrence_count": 4,
+        "detection_methods": ["column_name"],
+        "masked_evidence": ["A****", "B**", "C******"],
+    }
+    assert findings[("probable_personal_data", "participants.csv", "email")][
+        "evidence"
+    ] == {
+        "category": "email_address",
+        "occurrence_count": 3,
+        "detection_methods": ["column_name", "pattern_match"],
+        "masked_evidence": ["a****@e******.com", "b**@e******.com"],
+    }
+    response_body = response.text
+    assert "alice@example.com" not in response_body
+    assert "bob@example.com" not in response_body

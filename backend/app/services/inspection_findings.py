@@ -10,6 +10,7 @@ from app.schemas import (
     InspectedFile,
     InspectionFinding,
 )
+from app.services.privacy_detector import detect_probable_personal_data
 
 DATE_FORMATS = (
     ("YYYY-MM-DD", "%Y-%m-%d"),
@@ -72,6 +73,9 @@ def detect_inspection_findings(
         )
         findings.extend(
             _detect_suspicious_numeric_values(file, data_frames[file.relative_path])
+        )
+        findings.extend(
+            detect_probable_personal_data(file, data_frames[file.relative_path])
         )
 
         identifier_column = _primary_identifier_column(profile.column_names)
