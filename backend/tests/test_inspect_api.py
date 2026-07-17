@@ -37,3 +37,63 @@ def test_inspect_sample_returns_participants_csv_profile() -> None:
         },
         "duplicate_row_count": 0,
     }
+
+
+def test_inspect_sample_dataset_returns_inventory_and_csv_profiles() -> None:
+    response = client.get("/api/inspect/sample-dataset")
+
+    assert response.status_code == 200
+    inspection = response.json()
+    assert inspection["summary"] == {
+        "dataset_name": "soil-study",
+        "total_file_count": 3,
+        "csv_file_count": 2,
+        "total_size_bytes": 506,
+    }
+
+    files = {file["relative_path"]: file for file in inspection["files"]}
+    assert set(files) == {"README.md", "observations.csv", "participants.csv"}
+
+    assert files["README.md"] == {
+        "file_name": "README.md",
+        "relative_path": "README.md",
+        "extension": ".md",
+        "size_bytes": 153,
+        "csv_profile": None,
+    }
+
+    observations = files["observations.csv"]
+    assert observations["file_name"] == "observations.csv"
+    assert observations["extension"] == ".csv"
+    assert observations["size_bytes"] == 159
+    assert observations["csv_profile"] == {
+        "file_name": "observations.csv",
+        "row_count": 4,
+        "column_count": 4,
+        "column_names": [
+            "observation_id",
+            "participant_id",
+            "soil_moisture",
+            "recorded_at",
+        ],
+        "data_types": {
+            "observation_id": "String",
+            "participant_id": "String",
+            "soil_moisture": "Float64",
+            "recorded_at": "String",
+        },
+        "missing_value_counts": {
+            "observation_id": 0,
+            "participant_id": 0,
+            "soil_moisture": 0,
+            "recorded_at": 0,
+        },
+        "duplicate_row_count": 1,
+    }
+
+    participants = files["participants.csv"]
+    assert participants["file_name"] == "participants.csv"
+    assert participants["extension"] == ".csv"
+    assert participants["size_bytes"] == 194
+    assert participants["csv_profile"]["row_count"] == 4
+    assert participants["csv_profile"]["duplicate_row_count"] == 0
