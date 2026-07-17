@@ -97,3 +97,43 @@ def test_inspect_sample_dataset_returns_inventory_and_csv_profiles() -> None:
     assert participants["size_bytes"] == 194
     assert participants["csv_profile"]["row_count"] == 4
     assert participants["csv_profile"]["duplicate_row_count"] == 0
+
+    findings = {
+        (finding["type"], finding["file"], finding["affected_column"]): finding
+        for finding in inspection["findings"]
+    }
+    assert len(findings) == 6
+
+    assert findings[("missing_values", "participants.csv", "email")] == {
+        "type": "missing_values",
+        "severity": "medium",
+        "file": "participants.csv",
+        "affected_column": "email",
+        "evidence": {"missing_count": 1},
+        "message": "Column 'email' contains 1 missing value.",
+    }
+    assert findings[("missing_values", "participants.csv", "age")][
+        "evidence"
+    ] == {"missing_count": 1}
+    assert findings[("duplicate_rows", "observations.csv", None)]["evidence"] == {
+        "duplicate_row_count": 1
+    }
+    assert findings[
+        ("duplicate_identifier_values", "participants.csv", "participant_id")
+    ]["evidence"] == {
+        "duplicate_count": 1,
+        "duplicate_values": ["P002"],
+    }
+    assert findings[
+        ("duplicate_identifier_values", "observations.csv", "observation_id")
+    ]["evidence"] == {
+        "duplicate_count": 1,
+        "duplicate_values": ["O003"],
+    }
+    assert findings[("missing_reference", "observations.csv", "participant_id")][
+        "evidence"
+    ] == {
+        "referenced_file": "participants.csv",
+        "missing_values": ["P999"],
+        "reference_count": 2,
+    }

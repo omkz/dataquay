@@ -1,3 +1,5 @@
+from enum import StrEnum
+
 from pydantic import BaseModel
 
 
@@ -26,6 +28,28 @@ class InspectedFile(BaseModel):
     csv_profile: CsvProfile | None = None
 
 
+class FindingType(StrEnum):
+    MISSING_VALUES = "missing_values"
+    DUPLICATE_ROWS = "duplicate_rows"
+    DUPLICATE_IDENTIFIER_VALUES = "duplicate_identifier_values"
+    MISSING_REFERENCE = "missing_reference"
+
+
+class FindingSeverity(StrEnum):
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class InspectionFinding(BaseModel):
+    type: FindingType
+    severity: FindingSeverity
+    file: str
+    affected_column: str | None
+    evidence: dict[str, int | str | list[str]]
+    message: str
+
+
 class DatasetInspection(BaseModel):
     summary: DatasetSummary
     files: list[InspectedFile]
+    findings: list[InspectionFinding]
