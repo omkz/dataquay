@@ -10,7 +10,6 @@ export async function generateRecommendations(
   previousState: RecommendationActionState,
   formData: FormData,
 ): Promise<RecommendationActionState> {
-  void previousState;
   void formData;
 
   try {
@@ -28,6 +27,7 @@ export async function generateRecommendations(
       return {
         status: "configuration_error",
         recommendations: [],
+        generation: previousState.generation,
         message:
           "AI recommendations are not configured. Set DATAQUAY_AI_MODEL and the provider API key in the backend environment, then try again.",
       };
@@ -37,6 +37,7 @@ export async function generateRecommendations(
       return {
         status: "error",
         recommendations: [],
+        generation: previousState.generation,
         message: `The recommendation service returned HTTP ${response.status}. Please try again.`,
       };
     }
@@ -45,6 +46,7 @@ export async function generateRecommendations(
       return {
         status: "error",
         recommendations: [],
+        generation: previousState.generation,
         message:
           "The recommendation service returned an unexpected response. Check that the frontend and backend versions match.",
       };
@@ -53,11 +55,13 @@ export async function generateRecommendations(
     return {
       status: "success",
       recommendations: payload.recommendations,
+      generation: previousState.generation + 1,
     };
   } catch {
     return {
       status: "error",
       recommendations: [],
+      generation: previousState.generation,
       message:
         "DataQuay could not reach the recommendation service. Confirm that the backend is running and try again.",
     };

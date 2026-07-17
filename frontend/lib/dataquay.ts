@@ -62,6 +62,7 @@ export type RemediationRecommendation = {
 export type RecommendationActionState = {
   status: "idle" | "success" | "configuration_error" | "error";
   recommendations: RemediationRecommendation[];
+  generation: number;
   message?: string;
 };
 

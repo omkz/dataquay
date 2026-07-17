@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { generateRecommendations } from "@/app/actions/recommendations";
 import type {
@@ -11,7 +11,10 @@ import type {
 const initialState: RecommendationActionState = {
   status: "idle",
   recommendations: [],
+  generation: 0,
 };
+
+type RecommendationDecision = "pending" | "approved" | "rejected";
 
 export function RecommendationsPanel() {
   const [state, formAction, pending] = useActionState(
@@ -70,18 +73,105 @@ export function RecommendationsPanel() {
         ) : state.recommendations.length === 0 ? (
           <RecommendationEmpty />
         ) : (
-          <div className="recommendation-list">
-            {state.recommendations.map((recommendation, index) => (
-              <RecommendationCard
-                key={`${recommendation.related_finding.type}-${recommendation.related_finding.file}-${index}`}
-                recommendation={recommendation}
-                index={index + 1}
-              />
-            ))}
-          </div>
+          <RecommendationReview
+            key={state.generation}
+            recommendations={state.recommendations}
+          />
         )}
       </div>
     </section>
+  );
+}
+
+function RecommendationReview({
+  recommendations,
+}: {
+  recommendations: RemediationRecommendation[];
+}) {
+  const [decisions, setDecisions] = useState<
+    Record<string, RecommendationDecision>
+  >({});
+  const reviewedRecommendations = recommendations.map((recommendation, index) => {
+    const id = getRecommendationId(recommendation, index);
+    return {
+      id,
+      recommendation,
+      decision: decisions[id] ?? "pending",
+      index,
+    };
+  });
+  const decisionCounts = reviewedRecommendations.reduce(
+    (counts, item) => {
+      counts[item.decision] += 1;
+      return counts;
+    },
+    { pending: 0, approved: 0, rejected: 0 },
+  );
+  const approvedRecommendations = reviewedRecommendations.filter(
+    (item) => item.decision === "approved",
+  );
+
+  function updateDecision(id: string, decision: RecommendationDecision) {
+    setDecisions((current) => ({ ...current, [id]: decision }));
+  }
+
+  return (
+    <div className="recommendation-review">
+      <ReviewSummary counts={decisionCounts} />
+
+      <div className="recommendation-list">
+        {reviewedRecommendations.map((item) => (
+          <RecommendationCard
+            decision={item.decision}
+            index={item.index + 1}
+            key={item.id}
+            onDecision={(decision) => updateDecision(item.id, decision)}
+            recommendation={item.recommendation}
+          />
+        ))}
+      </div>
+
+      <ApprovedRemediationPlan items={approvedRecommendations} />
+    </div>
+  );
+}
+
+function ReviewSummary({
+  counts,
+}: {
+  counts: Record<RecommendationDecision, number>;
+}) {
+  return (
+    <div className="review-summary" aria-label="Recommendation review summary">
+      <div className="review-summary-heading">
+        <div>
+          <span>Review progress</span>
+          <strong>Current decisions</strong>
+        </div>
+        <small>Kept on this page only</small>
+      </div>
+      <div className="review-counts">
+        <ReviewCount decision="approved" count={counts.approved} />
+        <ReviewCount decision="rejected" count={counts.rejected} />
+        <ReviewCount decision="pending" count={counts.pending} />
+      </div>
+    </div>
+  );
+}
+
+function ReviewCount({
+  decision,
+  count,
+}: {
+  decision: RecommendationDecision;
+  count: number;
+}) {
+  return (
+    <div className={`review-count review-count-${decision}`}>
+      <span className="review-count-dot" aria-hidden="true" />
+      <strong>{count}</strong>
+      <span>{formatLabel(decision)}</span>
+    </div>
   );
 }
 
@@ -154,9 +244,13 @@ function RecommendationNotice({
 function RecommendationCard({
   recommendation,
   index,
+  decision,
+  onDecision,
 }: {
   recommendation: RemediationRecommendation;
   index: number;
+  decision: RecommendationDecision;
+  onDecision: (decision: RecommendationDecision) => void;
 }) {
   const confidence = Math.round(recommendation.confidence * 100);
   const finding = recommendation.related_finding;
@@ -214,7 +308,92 @@ function RecommendationCard({
         </div>
         <strong>{confidence}%</strong>
       </div>
+
+      <div className="decision-row">
+        <div className="current-decision">
+          <span>Current decision</span>
+          <strong className={`decision-label decision-${decision}`}>
+            {formatLabel(decision)}
+          </strong>
+        </div>
+        <div
+          className="decision-actions"
+          role="group"
+          aria-label={`Review decision for ${recommendation.short_title}`}
+        >
+          {(["pending", "approved", "rejected"] as const).map((option) => (
+            <button
+              aria-pressed={decision === option}
+              className={`decision-button decision-button-${option}`}
+              key={option}
+              onClick={() => onDecision(option)}
+              type="button"
+            >
+              {formatLabel(option)}
+            </button>
+          ))}
+        </div>
+      </div>
     </article>
+  );
+}
+
+function ApprovedRemediationPlan({
+  items,
+}: {
+  items: Array<{
+    id: string;
+    recommendation: RemediationRecommendation;
+    index: number;
+  }>;
+}) {
+  return (
+    <section className="approved-plan" aria-labelledby="approved-plan-title">
+      <div className="approved-plan-heading">
+        <div>
+          <p className="section-kicker">Human-reviewed proposals</p>
+          <h3 id="approved-plan-title">Approved remediation plan</h3>
+        </div>
+        <span>{items.length} approved</span>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="approved-plan-empty">
+          No recommendations have been approved. Approving a proposal adds it
+          here without applying any change to the dataset.
+        </div>
+      ) : (
+        <div className="approved-plan-list">
+          {items.map(({ id, recommendation, index }) => (
+            <article className="approved-plan-item" key={id}>
+              <span className="approved-plan-number">
+                {String(index + 1).padStart(2, "0")}
+              </span>
+              <div>
+                <h4>{recommendation.short_title}</h4>
+                <p>{recommendation.proposed_action}</p>
+                <code>
+                  {recommendation.related_finding.file}
+                  {recommendation.related_finding.affected_column
+                    ? ` / ${recommendation.related_finding.affected_column}`
+                    : ""}
+                </code>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function getRecommendationId(
+  recommendation: RemediationRecommendation,
+  index: number,
+) {
+  const finding = recommendation.related_finding;
+  return [finding.type, finding.file, finding.affected_column ?? "file", index].join(
+    "-",
   );
 }
 
