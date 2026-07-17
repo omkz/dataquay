@@ -41,6 +41,7 @@ class FindingType(StrEnum):
 class FindingSeverity(StrEnum):
     MEDIUM = "medium"
     HIGH = "high"
+    CRITICAL = "critical"
 
 
 class InspectionFinding(BaseModel):
@@ -52,7 +53,23 @@ class InspectionFinding(BaseModel):
     message: str
 
 
+class ReadinessStatus(StrEnum):
+    NOT_READY = "not_ready"
+    NEEDS_REVIEW = "needs_review"
+    READY = "ready"
+
+
+class ReadinessSummary(BaseModel):
+    total_finding_count: int
+    finding_counts_by_severity: dict[str, int]
+    finding_counts_by_type: dict[str, int]
+    blocker_count: int
+    human_review_required: bool
+    status: ReadinessStatus
+
+
 class DatasetInspection(BaseModel):
     summary: DatasetSummary
+    readiness: ReadinessSummary
     files: list[InspectedFile]
     findings: list[InspectionFinding]

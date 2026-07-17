@@ -3,6 +3,7 @@ from pathlib import Path
 from app.schemas import DatasetInspection, DatasetSummary, InspectedFile
 from app.services.csv_profiler import profile_csv
 from app.services.inspection_findings import detect_inspection_findings
+from app.services.readiness import calculate_readiness
 
 
 def inspect_dataset(directory_path: str | Path) -> DatasetInspection:
@@ -27,6 +28,8 @@ def inspect_dataset(directory_path: str | Path) -> DatasetInspection:
         for path in file_paths
     ]
 
+    findings = detect_inspection_findings(directory, files)
+
     return DatasetInspection(
         summary=DatasetSummary(
             dataset_name=directory.name,
@@ -34,6 +37,7 @@ def inspect_dataset(directory_path: str | Path) -> DatasetInspection:
             csv_file_count=sum(file.csv_profile is not None for file in files),
             total_size_bytes=sum(file.size_bytes for file in files),
         ),
+        readiness=calculate_readiness(findings),
         files=files,
-        findings=detect_inspection_findings(directory, files),
+        findings=findings,
     )

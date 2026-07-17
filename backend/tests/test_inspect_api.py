@@ -50,6 +50,22 @@ def test_inspect_sample_dataset_returns_inventory_and_csv_profiles() -> None:
         "csv_file_count": 2,
         "total_size_bytes": 506,
     }
+    assert inspection["readiness"] == {
+        "total_finding_count": 12,
+        "finding_counts_by_severity": {"high": 3, "medium": 9},
+        "finding_counts_by_type": {
+            "duplicate_identifier_values": 2,
+            "duplicate_rows": 1,
+            "inconsistent_date_formats": 2,
+            "missing_reference": 1,
+            "missing_values": 2,
+            "probable_personal_data": 2,
+            "suspicious_numeric_values": 2,
+        },
+        "blocker_count": 3,
+        "human_review_required": True,
+        "status": "not_ready",
+    }
 
     files = {file["relative_path"]: file for file in inspection["files"]}
     assert set(files) == {"README.md", "observations.csv", "participants.csv"}
