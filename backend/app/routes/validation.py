@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 
 from app.schemas import AuditAction, AuditStatus, DatasetValidationResult
-from app.services.audit_trail import append_audit_event
+from app.services.audit_trail import append_audit_event, commit_audited_mutation
 from app.services.dataset_workspace import DatasetNotFoundError
 from app.services.dataset_workflow import resolve_dataset_workflow_workspace
 from app.services.remediation_validation import (
@@ -76,7 +76,7 @@ def validate_uploaded_dataset_remediation(
             summary="Validation failed before checksum and finding results were available.",
         )
         raise
-    append_audit_event(
+    commit_audited_mutation(
         workflow.workspace_directory,
         dataset_id=dataset_id,
         action=AuditAction.VALIDATION,
@@ -86,6 +86,10 @@ def validate_uploaded_dataset_remediation(
             f"left {len(validation.remaining_findings)} remaining, and reported "
             f"readiness as {validation.readiness.status.value}."
         ),
+        mutation=lambda session: update_workspace_readiness(
+            dataset_id,
+            validation.readiness,
+            session=session,
+        ),
     )
-    update_workspace_readiness(dataset_id, validation.readiness)
     return validation

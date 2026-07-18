@@ -6,7 +6,7 @@ from app.schemas import (
     ClarificationUpdateRequest,
     DatasetClarifications,
 )
-from app.services.audit_trail import append_audit_event
+from app.services.audit_trail import append_audit_event, commit_audited_mutation
 from app.services.clarifications import (
     ClarificationError,
     ClarificationQuestionNotFoundError,
@@ -75,19 +75,13 @@ def update_uploaded_dataset_clarification(
             findings=inspection.findings,
             question_id=question_id,
             update=request,
+            persist=False,
         )
         updated_question = next(
             question
             for question in updated.questions
             if question.question_id == question_id
         )
-        clarifications = save_clarification_response(
-            dataset_id,
-            question_id=question_id,
-            status=updated_question.status,
-            answer=updated_question.answer,
-        )
-        store_dataset_clarifications(workflow.workspace_directory, clarifications)
     except ClarificationQuestionNotFoundError as exc:
         append_audit_event(
             workflow.workspace_directory,
@@ -108,7 +102,7 @@ def update_uploaded_dataset_clarification(
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     status_label = "answered" if request.decision.value == "answer" else "deferred"
-    append_audit_event(
+    clarifications = commit_audited_mutation(
         workflow.workspace_directory,
         dataset_id=dataset_id,
         action=AuditAction.CLARIFICATION_RESPONSE,
@@ -117,5 +111,13 @@ def update_uploaded_dataset_clarification(
             f"A clarification question was {status_label}. The response content "
             "was excluded from the audit trail."
         ),
+        mutation=lambda session: save_clarification_response(
+            dataset_id,
+            question_id=question_id,
+            status=updated_question.status,
+            answer=updated_question.answer,
+            session=session,
+        ),
     )
+    store_dataset_clarifications(workflow.workspace_directory, clarifications)
     return clarifications

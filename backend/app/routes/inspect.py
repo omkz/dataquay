@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
+from app.api_errors import ServiceUnavailableError
 from app.agents.data_steward import AIConfigurationError, generate_recommendations
 from app.schemas import (
     AuditAction,
@@ -10,7 +11,7 @@ from app.schemas import (
     DatasetInspection,
     RecommendationResponse,
 )
-from app.services.audit_trail import append_audit_event
+from app.services.audit_trail import append_audit_event, commit_audited_mutation
 from app.services.clarifications import (
     get_dataset_clarifications,
     store_dataset_clarifications,
@@ -87,7 +88,6 @@ async def recommend_uploaded_dataset_remediation(
             inspection,
             clarifications=clarifications,
         )
-        save_recommendation_batch(dataset_id, recommendations)
     except AIConfigurationError as exc:
         append_audit_event(
             workflow.workspace_directory,
@@ -100,6 +100,8 @@ async def recommend_uploaded_dataset_remediation(
             ),
         )
         raise
+    except ServiceUnavailableError:
+        raise
     except Exception:
         append_audit_event(
             workflow.workspace_directory,
@@ -109,7 +111,7 @@ async def recommend_uploaded_dataset_remediation(
             summary="Recommendation generation failed without returning proposals.",
         )
         raise
-    append_audit_event(
+    commit_audited_mutation(
         workflow.workspace_directory,
         dataset_id=dataset_id,
         action=AuditAction.RECOMMENDATION_GENERATION,
@@ -118,6 +120,11 @@ async def recommend_uploaded_dataset_remediation(
             f"Generated {len(recommendations.recommendations)} masked, "
             "proposal-only recommendations using the latest structured "
             "clarification state."
+        ),
+        mutation=lambda session: save_recommendation_batch(
+            dataset_id,
+            recommendations,
+            session=session,
         ),
     )
     return recommendations

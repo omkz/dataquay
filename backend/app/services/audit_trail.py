@@ -1,8 +1,14 @@
+from collections.abc import Callable
 from datetime import datetime, timezone
 import os
 from pathlib import Path
 import re
+from typing import TypeVar
 
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
+from app.database import session_scope
 from app.schemas import AuditAction, AuditEvent, AuditStatus, DatasetAuditTrail
 from app.services.workflow_repository import (
     PersistenceError,
@@ -24,6 +30,30 @@ class AuditTrailError(PersistenceError):
     """Raised when a dataset audit trail cannot be stored or read safely."""
 
 
+T = TypeVar("T")
+
+
+def commit_audited_mutation(
+    workspace_directory: str | Path,
+    *,
+    dataset_id: str,
+    action: AuditAction,
+    status: AuditStatus,
+    summary: str,
+    mutation: Callable[[Session], T],
+) -> T:
+    """Commit a database mutation and audit event, then mirror the event."""
+    result, event = _commit_audited(
+        dataset_id=dataset_id,
+        action=action,
+        status=status,
+        summary=summary,
+        mutation=mutation,
+    )
+    _mirror_audit_event(workspace_directory, event)
+    return result
+
+
 def append_audit_event(
     workspace_directory: str | Path,
     *,
@@ -32,7 +62,26 @@ def append_audit_event(
     status: AuditStatus,
     summary: str,
 ) -> AuditEvent:
-    """Append one constrained event without reading or rewriting prior events."""
+    """Commit one workflow event, then append its best-effort JSONL mirror."""
+    _, event = _commit_audited(
+        dataset_id=dataset_id,
+        action=action,
+        status=status,
+        summary=summary,
+        mutation=lambda _session: None,
+    )
+    _mirror_audit_event(workspace_directory, event)
+    return event
+
+
+def _commit_audited(
+    *,
+    dataset_id: str,
+    action: AuditAction,
+    status: AuditStatus,
+    summary: str,
+    mutation: Callable[[Session], T],
+) -> tuple[T, AuditEvent]:
     event = AuditEvent(
         timestamp=datetime.now(timezone.utc),
         action=action,
@@ -41,9 +90,24 @@ def append_audit_event(
         summary=_safe_summary(summary),
     )
     try:
-        persist_audit_event(event)
+        with session_scope() as session:
+            result = mutation(session)
+            persist_audit_event(event, session=session)
     except PersistenceError as exc:
-        raise AuditTrailError("The dataset audit event could not be persisted.") from exc
+        raise AuditTrailError(
+            "The workflow mutation and audit event could not be persisted."
+        ) from exc
+    except SQLAlchemyError as exc:
+        raise AuditTrailError(
+            "The workflow mutation and audit event could not be persisted."
+        ) from exc
+    return result, event
+
+
+def _mirror_audit_event(
+    workspace_directory: str | Path,
+    event: AuditEvent,
+) -> None:
     workspace = Path(workspace_directory).resolve()
     audit_directory = workspace / AUDIT_DIRECTORY_NAME
     payload = (event.model_dump_json() + "\n").encode("utf-8")
@@ -69,7 +133,6 @@ def append_audit_event(
         # PostgreSQL is authoritative. The JSONL copy is operationally useful,
         # but a mirror failure must not roll back a committed workflow event.
         pass
-    return event
 
 
 def read_audit_trail(

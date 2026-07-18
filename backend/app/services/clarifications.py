@@ -87,8 +87,9 @@ def update_dataset_clarification(
     findings: list[InspectionFinding],
     question_id: str,
     update: ClarificationUpdateRequest,
+    persist: bool = True,
 ) -> DatasetClarifications:
-    """Persist one human answer or deferral without changing dataset files."""
+    """Prepare one human answer or deferral and optionally store its snapshot."""
     workspace = Path(workspace_directory).resolve()
     current = get_dataset_clarifications(
         workspace,
@@ -127,7 +128,8 @@ def update_dataset_clarification(
         for question in current.questions
     ]
     result = _build_response(dataset_id, questions)
-    _write_clarifications(workspace, result)
+    if persist:
+        _write_clarifications(workspace, result)
     return result
 
 

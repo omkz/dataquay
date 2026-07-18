@@ -8,7 +8,7 @@ from app.schemas import (
     WorkspaceDetail,
     WorkspaceListResponse,
 )
-from app.services.audit_trail import append_audit_event
+from app.services.audit_trail import commit_audited_mutation
 from app.services.dataset_workspace import DatasetNotFoundError
 from app.services.dataset_workflow import resolve_dataset_workflow_workspace
 from app.services.workflow_repository import (
@@ -47,24 +47,25 @@ def update_recommendation_decision(
 ) -> RecommendationDecisionResponse:
     try:
         workflow = resolve_dataset_workflow_workspace(dataset_id)
-        decisions = save_human_decision(
-            dataset_id,
-            recommendation_key_value=request.recommendation_key,
-            decision=request.decision,
+        decisions = commit_audited_mutation(
+            workflow.workspace_directory,
+            dataset_id=dataset_id,
+            action=AuditAction.HUMAN_DECISION,
+            status=AuditStatus.SUCCESS,
+            summary=(
+                f"A remediation recommendation was marked {request.decision.value}. "
+                "The decision contains no raw dataset values."
+            ),
+            mutation=lambda session: save_human_decision(
+                dataset_id,
+                recommendation_key_value=request.recommendation_key,
+                decision=request.decision,
+                session=session,
+            ),
         )
     except DatasetNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    append_audit_event(
-        workflow.workspace_directory,
-        dataset_id=dataset_id,
-        action=AuditAction.HUMAN_DECISION,
-        status=AuditStatus.SUCCESS,
-        summary=(
-            f"A remediation recommendation was marked {request.decision.value}. "
-            "The decision contains no raw dataset values."
-        ),
-    )
     return RecommendationDecisionResponse(decisions=decisions)

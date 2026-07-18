@@ -1,8 +1,11 @@
+from collections.abc import Callable
 from datetime import datetime, timezone
+from typing import TypeVar
 from uuid import UUID, uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from app.api_errors import DatabaseUnavailableError
 from app.database import session_scope
@@ -38,6 +41,26 @@ from app.schemas import (
 
 class PersistenceError(DatabaseUnavailableError):
     """Raised when PostgreSQL workflow metadata cannot be read or stored."""
+
+
+T = TypeVar("T")
+
+
+def _run_persisted(
+    operation: Callable[[Session], T],
+    *,
+    session: Session | None,
+    error_message: str,
+) -> T:
+    try:
+        if session is not None:
+            return operation(session)
+        with session_scope() as managed_session:
+            return operation(managed_session)
+    except PersistenceError:
+        raise
+    except SQLAlchemyError as exc:
+        raise PersistenceError(error_message) from exc
 
 
 def create_workspace_record(
@@ -155,19 +178,25 @@ def get_workspace_detail(dataset_id: str) -> WorkspaceDetail | None:
 def update_workspace_readiness(
     dataset_id: str,
     readiness: ReadinessSummary,
+    *,
+    session: Session | None = None,
 ) -> None:
     workspace_id = _parse_workspace_id(dataset_id)
     if workspace_id is None:
         return
-    try:
-        with session_scope() as session:
-            workspace = session.get(Workspace, workspace_id)
-            if workspace is None:
-                return
-            workspace.readiness_status = readiness.status.value
-            workspace.updated_at = datetime.now(timezone.utc)
-    except SQLAlchemyError as exc:
-        raise PersistenceError("Workspace readiness could not be persisted.") from exc
+
+    def update(db: Session) -> None:
+        workspace = db.get(Workspace, workspace_id)
+        if workspace is None:
+            return
+        workspace.readiness_status = readiness.status.value
+        workspace.updated_at = datetime.now(timezone.utc)
+
+    _run_persisted(
+        update,
+        session=session,
+        error_message="Workspace readiness could not be persisted.",
+    )
 
 
 def sync_clarifications(
@@ -232,92 +261,97 @@ def save_clarification_response(
     question_id: str,
     status: ClarificationStatus,
     answer: str | None,
+    session: Session | None = None,
 ) -> DatasetClarifications:
     workspace_id = _parse_workspace_id(dataset_id)
     if workspace_id is None:
         raise PersistenceError("Dataset workspace metadata was not found.")
-    try:
-        with session_scope() as session:
-            record = session.get(ClarificationRecord, (workspace_id, question_id))
-            if record is None:
-                raise LookupError("Clarification question was not found for this dataset.")
-            record.status = status.value
-            record.answer = answer
-            record.updated_at = datetime.now(timezone.utc)
-            session.flush()
-            records = session.scalars(
-                select(ClarificationRecord)
-                .where(ClarificationRecord.workspace_id == workspace_id)
-                .order_by(ClarificationRecord.question_id)
-            ).all()
-            return _clarifications_from_records(dataset_id, records)
-    except LookupError:
-        raise
-    except SQLAlchemyError as exc:
-        raise PersistenceError("Clarification response could not be persisted.") from exc
+
+    def save(db: Session) -> DatasetClarifications:
+        record = db.get(ClarificationRecord, (workspace_id, question_id))
+        if record is None:
+            raise LookupError("Clarification question was not found for this dataset.")
+        record.status = status.value
+        record.answer = answer
+        record.updated_at = datetime.now(timezone.utc)
+        db.flush()
+        records = db.scalars(
+            select(ClarificationRecord)
+            .where(ClarificationRecord.workspace_id == workspace_id)
+            .order_by(ClarificationRecord.question_id)
+        ).all()
+        return _clarifications_from_records(dataset_id, records)
+
+    return _run_persisted(
+        save,
+        session=session,
+        error_message="Clarification response could not be persisted.",
+    )
 
 
 def save_recommendation_batch(
     dataset_id: str,
     response: RecommendationResponse,
+    *,
+    session: Session | None = None,
 ) -> None:
     workspace_id = _required_workspace_id(dataset_id)
-    try:
-        with session_scope() as session:
-            workspace = session.scalar(
-                select(Workspace)
-                .where(Workspace.id == workspace_id)
-                .with_for_update()
+
+    def save(db: Session) -> None:
+        workspace = db.scalar(
+            select(Workspace).where(Workspace.id == workspace_id).with_for_update()
+        )
+        if workspace is None:
+            raise LookupError("Dataset workspace metadata was not found.")
+        generation = db.scalar(
+            select(func.coalesce(func.max(RecommendationBatch.generation), 0)).where(
+                RecommendationBatch.workspace_id == workspace_id
             )
-            if workspace is None:
-                raise LookupError("Dataset workspace metadata was not found.")
-            generation = session.scalar(
-                select(func.coalesce(func.max(RecommendationBatch.generation), 0)).where(
-                    RecommendationBatch.workspace_id == workspace_id
+        )
+        batch = RecommendationBatch(
+            id=uuid4(),
+            workspace_id=workspace_id,
+            generation=int(generation or 0) + 1,
+        )
+        db.add(batch)
+        db.flush()
+        for index, recommendation in enumerate(response.recommendations):
+            key = recommendation_key(index)
+            db.add(
+                RecommendationRecord(
+                    id=uuid4(),
+                    batch_id=batch.id,
+                    recommendation_key=key,
+                    ordinal=index,
+                    finding_type=recommendation.related_finding.type.value,
+                    file_name=recommendation.related_finding.file,
+                    affected_column=recommendation.related_finding.affected_column,
+                    short_title=recommendation.short_title,
+                    rationale=recommendation.rationale,
+                    proposed_action=recommendation.proposed_action,
+                    confidence=recommendation.confidence,
+                    human_approval_required=recommendation.human_approval_required,
+                    assumptions=recommendation.assumptions,
                 )
             )
-            batch = RecommendationBatch(
-                id=uuid4(),
-                workspace_id=workspace_id,
-                generation=int(generation or 0) + 1,
+            db.add(
+                HumanDecision(
+                    id=uuid4(),
+                    workspace_id=workspace_id,
+                    batch_id=batch.id,
+                    recommendation_key=key,
+                    decision=RecommendationDecision.PENDING.value,
+                )
             )
-            session.add(batch)
-            session.flush()
-            for index, recommendation in enumerate(response.recommendations):
-                key = recommendation_key(index)
-                session.add(
-                    RecommendationRecord(
-                        id=uuid4(),
-                        batch_id=batch.id,
-                        recommendation_key=key,
-                        ordinal=index,
-                        finding_type=recommendation.related_finding.type.value,
-                        file_name=recommendation.related_finding.file,
-                        affected_column=recommendation.related_finding.affected_column,
-                        short_title=recommendation.short_title,
-                        rationale=recommendation.rationale,
-                        proposed_action=recommendation.proposed_action,
-                        confidence=recommendation.confidence,
-                        human_approval_required=recommendation.human_approval_required,
-                        assumptions=recommendation.assumptions,
-                    )
-                )
-                session.add(
-                    HumanDecision(
-                        id=uuid4(),
-                        workspace_id=workspace_id,
-                        batch_id=batch.id,
-                        recommendation_key=key,
-                        decision=RecommendationDecision.PENDING.value,
-                    )
-                )
-            workspace.workflow_status = "recommendations_ready"
-            workspace.current_stage = "review"
-            workspace.updated_at = datetime.now(timezone.utc)
-    except LookupError:
-        raise
-    except SQLAlchemyError as exc:
-        raise PersistenceError("Generated recommendations could not be persisted.") from exc
+        workspace.workflow_status = "recommendations_ready"
+        workspace.current_stage = "review"
+        workspace.updated_at = datetime.now(timezone.utc)
+
+    _run_persisted(
+        save,
+        session=session,
+        error_message="Generated recommendations could not be persisted.",
+    )
 
 
 def save_human_decision(
@@ -325,67 +359,76 @@ def save_human_decision(
     *,
     recommendation_key_value: str,
     decision: RecommendationDecision,
+    session: Session | None = None,
 ) -> dict[str, RecommendationDecision]:
     workspace_id = _required_workspace_id(dataset_id)
-    try:
-        with session_scope() as session:
-            batch = _latest_batch(session, workspace_id)
-            if batch is None:
-                raise LookupError("No persisted recommendations are available for review.")
-            record = session.scalar(
-                select(HumanDecision).where(
-                    HumanDecision.batch_id == batch.id,
-                    HumanDecision.recommendation_key == recommendation_key_value,
-                )
+
+    def save(db: Session) -> dict[str, RecommendationDecision]:
+        batch = _latest_batch(db, workspace_id)
+        if batch is None:
+            raise LookupError("No persisted recommendations are available for review.")
+        record = db.scalar(
+            select(HumanDecision).where(
+                HumanDecision.batch_id == batch.id,
+                HumanDecision.recommendation_key == recommendation_key_value,
             )
-            if record is None:
-                raise LookupError("Recommendation was not found in the current generation.")
-            record.decision = decision.value
-            record.updated_at = datetime.now(timezone.utc)
-            workspace = session.get(Workspace, workspace_id)
-            if workspace is not None:
-                workspace.workflow_status = "in_review"
-                workspace.current_stage = "review"
-                workspace.updated_at = datetime.now(timezone.utc)
-            session.flush()
-            rows = session.scalars(
-                select(HumanDecision).where(HumanDecision.batch_id == batch.id)
-            ).all()
-            return {
-                row.recommendation_key: RecommendationDecision(row.decision)
-                for row in rows
-            }
-    except LookupError:
-        raise
-    except SQLAlchemyError as exc:
-        raise PersistenceError("The human decision could not be persisted.") from exc
+        )
+        if record is None:
+            raise LookupError("Recommendation was not found in the current generation.")
+        record.decision = decision.value
+        record.updated_at = datetime.now(timezone.utc)
+        workspace = db.get(Workspace, workspace_id)
+        if workspace is not None:
+            workspace.workflow_status = "in_review"
+            workspace.current_stage = "review"
+            workspace.updated_at = datetime.now(timezone.utc)
+        db.flush()
+        rows = db.scalars(
+            select(HumanDecision).where(HumanDecision.batch_id == batch.id)
+        ).all()
+        return {
+            row.recommendation_key: RecommendationDecision(row.decision)
+            for row in rows
+        }
+
+    return _run_persisted(
+        save,
+        session=session,
+        error_message="The human decision could not be persisted.",
+    )
 
 
-def persist_audit_event(event: AuditEvent) -> None:
+def persist_audit_event(
+    event: AuditEvent,
+    *,
+    session: Session | None = None,
+) -> None:
     workspace_id = _parse_workspace_id(event.dataset_id)
     if workspace_id is None:
         raise PersistenceError("Dataset workspace metadata was not found.")
-    try:
-        with session_scope() as session:
-            workspace = session.get(Workspace, workspace_id)
-            if workspace is None:
-                raise PersistenceError("Dataset workspace metadata was not found.")
-            session.add(
-                AuditEventRecord(
-                    workspace_id=workspace_id,
-                    timestamp=event.timestamp,
-                    action=event.action.value,
-                    status=event.status.value,
-                    summary=event.summary,
-                )
+
+    def save(db: Session) -> None:
+        workspace = db.get(Workspace, workspace_id)
+        if workspace is None:
+            raise PersistenceError("Dataset workspace metadata was not found.")
+        db.add(
+            AuditEventRecord(
+                workspace_id=workspace_id,
+                timestamp=event.timestamp,
+                action=event.action.value,
+                status=event.status.value,
+                summary=event.summary,
             )
-            _apply_workflow_event(workspace, event.action, event.status)
-            workspace.updated_at = event.timestamp
-            session.flush()
-    except PersistenceError:
-        raise
-    except SQLAlchemyError as exc:
-        raise PersistenceError("The audit event could not be persisted.") from exc
+        )
+        _apply_workflow_event(workspace, event.action, event.status)
+        workspace.updated_at = event.timestamp
+        db.flush()
+
+    _run_persisted(
+        save,
+        session=session,
+        error_message="The audit event could not be persisted.",
+    )
 
 
 def read_persisted_audit_trail(dataset_id: str) -> DatasetAuditTrail:
