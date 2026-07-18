@@ -19,7 +19,14 @@ import type {
   RemediationApplyResponse,
   RemediationPreviewResponse,
   RemediationRecommendation,
+  ReadinessStatus,
 } from "@/lib/dataquay";
+
+export type ValidationBaseline = {
+  blockerCount: number;
+  readinessStatus: ReadinessStatus;
+  totalFindingCount: number;
+};
 
 type WorkflowStep = "preview" | "apply" | "validate" | "package";
 type StepState<T> =
@@ -32,9 +39,11 @@ const idleState = { status: "idle" } as const;
 export function RemediationWorkflow({
   approvedRecommendations,
   datasetId,
+  validationBaseline,
 }: {
   approvedRecommendations: RemediationRecommendation[];
   datasetId?: string;
+  validationBaseline: ValidationBaseline;
 }) {
   const [preview, setPreview] = useState<StepState<RemediationPreviewResponse>>(
     idleState,
@@ -294,7 +303,10 @@ export function RemediationWorkflow({
           {validation.status === "error" ? (
             <WorkflowError state={validation} />
           ) : validation.status === "success" ? (
-            <ValidationResult validation={validation.data} />
+            <ValidationResult
+              baseline={validationBaseline}
+              validation={validation.data}
+            />
           ) : null}
         </WorkflowStepCard>
 
@@ -567,41 +579,97 @@ function OutcomeGroup({
 }
 
 function ValidationResult({
+  baseline,
   validation,
 }: {
+  baseline: ValidationBaseline;
   validation: DatasetValidationResult;
 }) {
   const checksumsPassed =
     validation.source_checksums_verified &&
     validation.output_checksums_verified &&
     validation.original_files_unchanged;
+  const remainingCount = validation.remaining_findings.length;
+  const remainingBlockers = validation.readiness.blocker_count;
+  const blockerReduction = Math.max(
+    baseline.blockerCount - remainingBlockers,
+    0,
+  );
+
   return (
     <div className="workflow-result-stack">
-      <div className="workflow-result-summary">
-        <ResultMetric
-          label="Resolved issues"
-          value={validation.resolved_findings.length}
-          tone="success"
-        />
-        <ResultMetric
-          label="Remaining issues"
-          value={validation.remaining_findings.length}
-          tone="warning"
-        />
-        <ResultMetric
-          label="Blockers"
-          value={validation.readiness.blocker_count}
-          tone={validation.readiness.blocker_count > 0 ? "error" : "success"}
-        />
-      </div>
-      <div className={`checksum-banner ${checksumsPassed ? "passed" : "failed"}`}>
-        <strong>
-          {checksumsPassed ? "Checksum verification passed" : "Checksum verification failed"}
-        </strong>
-        <span>
-          Original files {validation.original_files_unchanged ? "unchanged" : "changed"}
-          {" · "}Readiness {formatLabel(validation.readiness.status)}
+      <section
+        className="validation-comparison"
+        aria-labelledby="validation-comparison-title"
+      >
+        <div className="validation-comparison-heading">
+          <div>
+            <span>Validation comparison</span>
+            <h5 id="validation-comparison-title">Before and after remediation</h5>
+          </div>
+          <strong className={`validation-readiness status-${validation.readiness.status}`}>
+            {formatLabel(validation.readiness.status)}
+          </strong>
+        </div>
+
+        <div className="validation-before-after">
+          <ValidationSnapshot
+            blockerCount={baseline.blockerCount}
+            findingCount={baseline.totalFindingCount}
+            label="Before"
+            status={baseline.readinessStatus}
+          />
+          <div className="validation-direction" aria-hidden="true">
+            <span>→</span>
+            <small>safe actions</small>
+          </div>
+          <ValidationSnapshot
+            blockerCount={remainingBlockers}
+            findingCount={remainingCount}
+            label="After"
+            status={validation.readiness.status}
+          />
+        </div>
+
+        <div className="validation-deltas" aria-label="Validation outcomes">
+          <ResultMetric
+            label="Resolved findings"
+            value={validation.resolved_findings.length}
+            tone="success"
+          />
+          <ResultMetric
+            label="Remaining findings"
+            value={remainingCount}
+            tone={remainingCount > 0 ? "warning" : "success"}
+          />
+          <ResultMetric
+            label="Blocker reduction"
+            value={blockerReduction}
+            tone={remainingBlockers > 0 ? "warning" : "success"}
+          />
+        </div>
+      </section>
+
+      <div
+        className={`validation-integrity ${checksumsPassed ? "passed" : "failed"}`}
+        role="status"
+      >
+        <span className="validation-integrity-mark" aria-hidden="true">
+          {checksumsPassed ? "✓" : "!"}
         </span>
+        <div>
+          <strong>
+            {validation.original_files_unchanged
+              ? "Original files confirmed unchanged"
+              : "Original file changes detected"}
+          </strong>
+          <p>
+            {validation.source_checksums_verified &&
+            validation.output_checksums_verified
+              ? "Source and working-copy checksums were verified."
+              : "One or more source or working-copy checksums could not be verified."}
+          </p>
+        </div>
       </div>
       <FindingOutcomeGroup
         title="Resolved issues"
@@ -619,6 +687,37 @@ function ValidationResult({
   );
 }
 
+function ValidationSnapshot({
+  blockerCount,
+  findingCount,
+  label,
+  status,
+}: {
+  blockerCount: number;
+  findingCount: number;
+  label: string;
+  status: ReadinessStatus;
+}) {
+  return (
+    <div className="validation-snapshot">
+      <div>
+        <span>{label}</span>
+        <strong>{formatLabel(status)}</strong>
+      </div>
+      <dl>
+        <div>
+          <dt>Findings</dt>
+          <dd>{findingCount}</dd>
+        </div>
+        <div>
+          <dt>Blockers</dt>
+          <dd>{blockerCount}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
 function FindingOutcomeGroup({
   title,
   findings,
@@ -630,12 +729,22 @@ function FindingOutcomeGroup({
   empty: string;
   tone: "resolved" | "remaining";
 }) {
+  if (findings.length === 0) {
+    return (
+      <div className="validation-outcome-empty">
+        <strong>{title}</strong>
+        <span>{empty}</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="outcome-group">
-      <h5>{title}</h5>
-      {findings.length === 0 ? (
-        <p className="outcome-empty">{empty}</p>
-      ) : (
+    <details className={`validation-outcome-details validation-outcome-${tone}`}>
+      <summary>
+        <span>{title}</span>
+        <strong>{findings.length}</strong>
+      </summary>
+      <div className="validation-outcome-content">
         <div className="finding-outcome-list">
           {findings.map((finding, index) => (
             <div
@@ -654,8 +763,8 @@ function FindingOutcomeGroup({
             </div>
           ))}
         </div>
-      )}
-    </div>
+      </div>
+    </details>
   );
 }
 

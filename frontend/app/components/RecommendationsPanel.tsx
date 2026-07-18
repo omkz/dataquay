@@ -4,7 +4,10 @@ import { useActionState, useEffect, useState } from "react";
 
 import { generateRecommendations } from "@/app/actions/recommendations";
 import { notifyDatasetAuditUpdated } from "@/app/components/AuditTimeline";
-import { RemediationWorkflow } from "@/app/components/RemediationWorkflow";
+import {
+  RemediationWorkflow,
+  type ValidationBaseline,
+} from "@/app/components/RemediationWorkflow";
 import { reportWorkflowProgress } from "@/app/components/WorkflowStepper";
 import type {
   RecommendationActionState,
@@ -19,7 +22,13 @@ const initialState: RecommendationActionState = {
 
 type RecommendationDecision = "pending" | "approved" | "rejected";
 
-export function RecommendationsPanel({ datasetId }: { datasetId?: string }) {
+export function RecommendationsPanel({
+  datasetId,
+  validationBaseline,
+}: {
+  datasetId?: string;
+  validationBaseline: ValidationBaseline;
+}) {
   const [state, formAction, pending] = useActionState(
     generateRecommendations,
     initialState,
@@ -124,6 +133,7 @@ export function RecommendationsPanel({ datasetId }: { datasetId?: string }) {
             datasetId={datasetId}
             key={state.generation}
             recommendations={state.recommendations}
+            validationBaseline={validationBaseline}
           />
         )}
       </div>
@@ -134,9 +144,11 @@ export function RecommendationsPanel({ datasetId }: { datasetId?: string }) {
 function RecommendationReview({
   recommendations,
   datasetId,
+  validationBaseline,
 }: {
   recommendations: RemediationRecommendation[];
   datasetId?: string;
+  validationBaseline: ValidationBaseline;
 }) {
   const [decisions, setDecisions] = useState<
     Record<string, RecommendationDecision>
@@ -209,6 +221,7 @@ function RecommendationReview({
       <ApprovedRemediationPlan
         datasetId={datasetId}
         items={approvedRecommendations}
+        validationBaseline={validationBaseline}
       />
     </div>
   );
@@ -361,31 +374,37 @@ function RecommendationCard({
         </code>
       </div>
 
-      <div className="recommendation-copy-grid">
-        <div>
-          <span>Rationale</span>
-          <p>{recommendation.rationale}</p>
-        </div>
-        <div className="proposed-action">
-          <span>Proposed action</span>
-          <p>{recommendation.proposed_action}</p>
-        </div>
+      <div className="recommendation-primary-action">
+        <span>Proposed action</span>
+        <p>{recommendation.proposed_action}</p>
       </div>
 
-      <div className="confidence-row">
-        <span>Confidence</span>
-        <div
-          className="confidence-track"
-          role="progressbar"
-          aria-label={`Recommendation confidence: ${confidence}%`}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={confidence}
-        >
-          <span style={{ width: `${confidence}%` }} />
+      <details className="recommendation-details">
+        <summary>
+          <span>View rationale and confidence</span>
+          <small>{confidence}% confidence</small>
+        </summary>
+        <div className="recommendation-detail-body">
+          <div className="recommendation-rationale">
+            <span>Rationale</span>
+            <p>{recommendation.rationale}</p>
+          </div>
+          <div className="confidence-row">
+            <span>Confidence</span>
+            <div
+              className="confidence-track"
+              role="progressbar"
+              aria-label={`Recommendation confidence: ${confidence}%`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={confidence}
+            >
+              <span style={{ width: `${confidence}%` }} />
+            </div>
+            <strong>{confidence}%</strong>
+          </div>
         </div>
-        <strong>{confidence}%</strong>
-      </div>
+      </details>
 
       <div className="decision-row">
         <div className="current-decision">
@@ -419,6 +438,7 @@ function RecommendationCard({
 function ApprovedRemediationPlan({
   items,
   datasetId,
+  validationBaseline,
 }: {
   items: Array<{
     id: string;
@@ -426,6 +446,7 @@ function ApprovedRemediationPlan({
     index: number;
   }>;
   datasetId?: string;
+  validationBaseline: ValidationBaseline;
 }) {
   return (
     <section className="approved-plan" aria-labelledby="approved-plan-title">
@@ -468,6 +489,7 @@ function ApprovedRemediationPlan({
         approvedRecommendations={items.map((item) => item.recommendation)}
         datasetId={datasetId}
         key={items.map((item) => item.id).join("|") || "no-approvals"}
+        validationBaseline={validationBaseline}
       />
     </section>
   );

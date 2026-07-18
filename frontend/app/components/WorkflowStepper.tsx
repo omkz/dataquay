@@ -202,12 +202,19 @@ export function WorkflowStepper({
         }`}
         aria-live="polite"
       >
-        <span>{nextStep ? "Next action" : "Workflow complete"}</span>
-        <strong>
-          {nextStep
-            ? nextStep.message ?? nextStep.waitingMessage
-            : "The package was downloaded. Start over to inspect another dataset."}
-        </strong>
+        <div className="workflow-current-stage">
+          <span>{nextStep ? "Current stage" : "Current status"}</span>
+          <strong>{nextStep?.label ?? "Workflow complete"}</strong>
+          {nextStep ? <small>{statusLabels[nextStep.status]}</small> : null}
+        </div>
+        <div className="workflow-recommended-action">
+          <span>{nextStep ? "Next recommended action" : "What’s next"}</span>
+          <strong>
+            {nextStep
+              ? nextStep.message ?? nextStep.waitingMessage
+              : "The package was downloaded. Start over to inspect another dataset."}
+          </strong>
+        </div>
       </div>
     </section>
   );

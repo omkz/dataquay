@@ -1,11 +1,11 @@
 import Link from "next/link";
 
 import { AuditTimeline } from "@/app/components/AuditTimeline";
+import { FindingsExplorer } from "@/app/components/FindingsExplorer";
 import { RecommendationsPanel } from "@/app/components/RecommendationsPanel";
 import { WorkflowStepper } from "@/app/components/WorkflowStepper";
 import type {
   DatasetInspection,
-  InspectionFinding,
   InspectedFile,
   ReadinessStatus,
 } from "@/lib/dataquay";
@@ -185,24 +185,17 @@ export function DatasetOverview({
             </div>
             <span className="section-meta">Deterministic rules</span>
           </div>
-          <div className="findings-list">
-            {findings.length > 0 ? (
-              findings.map((finding, index) => (
-                <FindingCard
-                  finding={finding}
-                  index={index + 1}
-                  key={`${finding.type}-${finding.file}-${finding.affected_column ?? "file"}`}
-                />
-              ))
-            ) : (
-              <div className="empty-dashboard-state">
-                No structured findings to review.
-              </div>
-            )}
-          </div>
+          <FindingsExplorer findings={findings} />
         </section>
 
-        <RecommendationsPanel datasetId={datasetId} />
+        <RecommendationsPanel
+          datasetId={datasetId}
+          validationBaseline={{
+            blockerCount: readiness.blocker_count,
+            readinessStatus: readiness.status,
+            totalFindingCount: readiness.total_finding_count,
+          }}
+        />
         {datasetId ? <AuditTimeline datasetId={datasetId} /> : null}
       </main>
 
@@ -281,58 +274,6 @@ function FileRow({ file }: { file: InspectedFile }) {
       </td>
     </tr>
   );
-}
-
-function FindingCard({
-  finding,
-  index,
-}: {
-  finding: InspectionFinding;
-  index: number;
-}) {
-  return (
-    <article className="finding-card">
-      <div className="finding-number">{String(index).padStart(2, "0")}</div>
-      <div className="finding-body">
-        <div className="finding-header">
-          <div className="finding-badges">
-            <span className={`severity-badge severity-${finding.severity}`}>
-              {formatLabel(finding.severity)}
-            </span>
-            <span className="finding-type">{formatLabel(finding.type)}</span>
-          </div>
-          <div className="finding-location">
-            <span>{finding.file}</span>
-            <span aria-hidden="true">/</span>
-            <strong>{finding.affected_column ?? "Entire file"}</strong>
-          </div>
-        </div>
-        <p className="finding-message">{finding.message}</p>
-        <dl className="evidence-grid">
-          {Object.entries(finding.evidence).map(([label, value]) => (
-            <div key={label}>
-              <dt>{formatLabel(label)}</dt>
-              <dd>{formatEvidence(value)}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-    </article>
-  );
-}
-
-function formatEvidence(value: string | number | string[]) {
-  if (Array.isArray(value)) {
-    return (
-      <span className="evidence-values">
-        {value.map((item) => (
-          <code key={item}>{item}</code>
-        ))}
-      </span>
-    );
-  }
-
-  return typeof value === "number" ? value.toLocaleString() : value;
 }
 
 function formatLabel(value: string) {
