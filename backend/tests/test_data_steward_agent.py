@@ -11,6 +11,11 @@ from app.agents.data_steward import (
     generate_recommendations,
     get_configured_model_name,
 )
+from app.schemas import ClarificationUpdateRequest
+from app.services.clarifications import (
+    get_dataset_clarifications,
+    update_dataset_clarification,
+)
 from app.services.dataset_inspector import inspect_dataset
 
 models.ALLOW_MODEL_REQUESTS = False
@@ -30,6 +35,9 @@ def test_recommendation_context_contains_only_safe_inspection_projection() -> No
         "dataset_summary",
         "readiness",
         "masked_findings",
+        "confirmed_information",
+        "unanswered_questions",
+        "deferred_questions",
     }
     assert context.dataset_summary.dataset_name == "soil-study"
     assert context.readiness.total_finding_count == 12
@@ -59,6 +67,46 @@ def test_recommendation_context_contains_only_safe_inspection_projection() -> No
     )
 
 
+def test_recommendation_context_separates_confirmed_open_and_deferred_context(
+    tmp_path: Path,
+) -> None:
+    inspection = inspect_dataset(SAMPLE_DATASET_PATH)
+    dataset_id = "00000000-0000-4000-8000-000000000001"
+    clarifications = get_dataset_clarifications(
+        tmp_path,
+        dataset_id=dataset_id,
+        findings=inspection.findings,
+    )
+    answered_question = clarifications.questions[0]
+    deferred_question = clarifications.questions[1]
+    clarifications = update_dataset_clarification(
+        tmp_path,
+        dataset_id=dataset_id,
+        findings=inspection.findings,
+        question_id=answered_question.question_id,
+        update=ClarificationUpdateRequest(
+            decision="answer",
+            answer="The missing value is expected; contact owner@example.com.",
+        ),
+    )
+    clarifications = update_dataset_clarification(
+        tmp_path,
+        dataset_id=dataset_id,
+        findings=inspection.findings,
+        question_id=deferred_question.question_id,
+        update=ClarificationUpdateRequest(decision="defer"),
+    )
+
+    context = build_recommendation_context(inspection, clarifications)
+    serialized = context.model_dump_json()
+
+    assert len(context.confirmed_information) == 1
+    assert "[masked-email]" in context.confirmed_information[0].confirmed_information
+    assert len(context.deferred_questions) == 1
+    assert len(context.unanswered_questions) == len(clarifications.questions) - 2
+    assert "owner@example.com" not in serialized
+
+
 def test_data_steward_agent_returns_structured_recommendations_without_network() -> None:
     inspection = inspect_dataset(SAMPLE_DATASET_PATH)
     test_model = TestModel(
@@ -75,6 +123,9 @@ def test_data_steward_agent_returns_structured_recommendations_without_network()
                     "proposed_action": "Confirm and document the missing-value policy.",
                     "confidence": 0.9,
                     "human_approval_required": True,
+                    "assumptions": [
+                        "The reason for the missing value remains unknown."
+                    ],
                 }
             ]
         }
@@ -90,6 +141,9 @@ def test_data_steward_agent_returns_structured_recommendations_without_network()
     assert recommendation.related_finding.file == "participants.csv"
     assert recommendation.confidence == 0.9
     assert recommendation.human_approval_required is True
+    assert recommendation.assumptions == [
+        "The reason for the missing value remains unknown."
+    ]
 
 
 def test_missing_model_configuration_is_reported_clearly(

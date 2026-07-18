@@ -11,6 +11,7 @@ import {
 } from "@/lib/dataquay";
 
 export type DemoWorkflowStep =
+  | "clarifications"
   | "recommendations"
   | "review"
   | "remediation"
@@ -45,6 +46,11 @@ const stepDefinitions: StepDefinition[] = [
     key: "inspection",
     label: "Inspection",
     waitingMessage: "Wait for deterministic inspection to complete.",
+  },
+  {
+    key: "clarifications",
+    label: "Clarification",
+    waitingMessage: "Answer or defer research-context questions before refreshing AI guidance.",
   },
   {
     key: "recommendations",
@@ -157,11 +163,14 @@ export function WorkflowStepper({
           }),
         };
       }
+      if (definition.key === "clarifications" && !datasetId) {
+        return { ...definition, status: "complete" as const };
+      }
       const base = reconstructed[definition.key];
       const signal = signals[definition.key];
       return { ...definition, ...(signal ?? base) };
     });
-  }, [auditEvents, signals, stage]);
+  }, [auditEvents, datasetId, signals, stage]);
   const nextStep = steps.find((step) => step.status !== "complete");
 
   return (
@@ -241,14 +250,28 @@ function reconstructProgress(
   events: AuditEvent[],
 ): Record<DemoWorkflowStep, ProgressSignal> {
   const progress: Record<DemoWorkflowStep, ProgressSignal> = {
+    clarifications: { status: "waiting" },
     recommendations: { status: "waiting" },
     review: { status: "waiting" },
     remediation: { status: "waiting" },
     validation: { status: "waiting" },
     package: { status: "waiting" },
   };
+  const clarificationReview = latestEvent(events, "clarification_review");
+  const clarificationResponse = latestEvent(events, "clarification_response");
+  const clarification = laterEvent(clarificationReview, clarificationResponse);
   const recommendation = latestEvent(events, "recommendation_generation");
+  if (clarification) {
+    progress.clarifications = eventSignal(
+      clarification.event,
+      "Clarification context is available. Answer, defer, or continue with explicitly labelled assumptions.",
+      "active",
+    );
+  }
   if (recommendation) {
+    if (!clarification || recommendation.index > clarification.index) {
+      progress.clarifications = { status: "complete" };
+    }
     progress.recommendations = eventSignal(
       recommendation.event,
       "Recommendations are ready. Review each proposal and record a decision.",

@@ -11,6 +11,7 @@ from app.schemas import (
     RecommendationResponse,
 )
 from app.services.audit_trail import append_audit_event
+from app.services.clarifications import get_dataset_clarifications
 from app.services.csv_profiler import profile_csv
 from app.services.dataset_inspector import inspect_dataset
 from app.services.dataset_workspace import (
@@ -92,7 +93,15 @@ async def recommend_uploaded_dataset_remediation(
     except DatasetNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     try:
-        recommendations = await generate_recommendations(inspection)
+        clarifications = get_dataset_clarifications(
+            workflow.workspace_directory,
+            dataset_id=dataset_id,
+            findings=inspection.findings,
+        )
+        recommendations = await generate_recommendations(
+            inspection,
+            clarifications=clarifications,
+        )
     except AIConfigurationError as exc:
         append_audit_event(
             workflow.workspace_directory,
@@ -121,7 +130,8 @@ async def recommend_uploaded_dataset_remediation(
         status=AuditStatus.SUCCESS,
         summary=(
             f"Generated {len(recommendations.recommendations)} masked, "
-            "proposal-only recommendations for human review."
+            "proposal-only recommendations using the latest structured "
+            "clarification state."
         ),
     )
     return recommendations

@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class CsvProfile(BaseModel):
@@ -91,6 +91,8 @@ class AuditAction(StrEnum):
     UPLOAD = "upload"
     INSPECTION = "inspection"
     RECOMMENDATION_GENERATION = "recommendation_generation"
+    CLARIFICATION_REVIEW = "clarification_review"
+    CLARIFICATION_RESPONSE = "clarification_response"
     REMEDIATION_PREVIEW = "remediation_preview"
     REMEDIATION_APPLY = "remediation_apply"
     VALIDATION = "validation"
@@ -129,10 +131,60 @@ class RemediationRecommendation(BaseModel):
     proposed_action: str = Field(min_length=1)
     confidence: float = Field(ge=0, le=1)
     human_approval_required: bool
+    assumptions: list[str] = Field(default_factory=list)
 
 
 class RecommendationResponse(BaseModel):
     recommendations: list[RemediationRecommendation]
+
+
+class ClarificationStatus(StrEnum):
+    UNANSWERED = "unanswered"
+    ANSWERED = "answered"
+    DEFERRED = "deferred"
+
+
+class ClarificationDecision(StrEnum):
+    ANSWER = "answer"
+    DEFER = "defer"
+
+
+class ClarificationQuestion(BaseModel):
+    question_id: str
+    related_finding: FindingReference
+    question: str
+    why_this_matters: str
+    status: ClarificationStatus
+    answer: str | None = None
+    updated_at: datetime | None = None
+
+
+class ClarificationSummary(BaseModel):
+    total_count: int
+    answered_count: int
+    deferred_count: int
+    unanswered_count: int
+
+
+class DatasetClarifications(BaseModel):
+    dataset_id: str
+    summary: ClarificationSummary
+    questions: list[ClarificationQuestion]
+
+
+class ClarificationUpdateRequest(BaseModel):
+    decision: ClarificationDecision
+    answer: str | None = Field(default=None, max_length=2_000)
+
+    @model_validator(mode="after")
+    def validate_decision_payload(self) -> "ClarificationUpdateRequest":
+        if self.decision == ClarificationDecision.ANSWER and not (
+            self.answer and self.answer.strip()
+        ):
+            raise ValueError("An answer is required when answering a question.")
+        if self.decision == ClarificationDecision.DEFER and self.answer is not None:
+            raise ValueError("Deferred questions cannot include an answer.")
+        return self
 
 
 class RemediationOperation(StrEnum):

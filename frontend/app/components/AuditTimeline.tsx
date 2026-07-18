@@ -176,6 +176,8 @@ function formatTimestamp(timestamp: string) {
 const actionLabels: Record<AuditAction, string> = {
   upload: "Dataset upload",
   inspection: "Dataset inspection",
+  clarification_review: "Clarification review",
+  clarification_response: "Clarification response",
   recommendation_generation: "Recommendation generation",
   remediation_preview: "Remediation preview",
   remediation_apply: "Remediation apply",

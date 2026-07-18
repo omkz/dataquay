@@ -80,8 +80,9 @@ def test_uploaded_dataset_completes_workflow_without_changing_originals(
     original_before = _directory_contents(original_directory)
     archive_before = (workspace / "archive" / "upload.zip").read_bytes()
 
-    async def fake_recommendations(inspection):
+    async def fake_recommendations(inspection, *, clarifications):
         assert inspection.summary.dataset_name == "uploaded-soil"
+        assert clarifications.summary.total_count > 0
         return RecommendationResponse(recommendations=[])
 
     monkeypatch.setattr(

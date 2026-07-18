@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { AuditTimeline } from "@/app/components/AuditTimeline";
+import { ClarificationPanel } from "@/app/components/ClarificationPanel";
 import { FindingsExplorer } from "@/app/components/FindingsExplorer";
 import { RecommendationsPanel } from "@/app/components/RecommendationsPanel";
 import { WorkflowStepper } from "@/app/components/WorkflowStepper";
@@ -187,6 +188,8 @@ export function DatasetOverview({
           </div>
           <FindingsExplorer findings={findings} />
         </section>
+
+        {datasetId ? <ClarificationPanel datasetId={datasetId} /> : null}
 
         <RecommendationsPanel
           datasetId={datasetId}

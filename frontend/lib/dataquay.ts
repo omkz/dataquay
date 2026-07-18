@@ -62,6 +62,8 @@ export type DatasetUploadResponse = {
 export type AuditAction =
   | "upload"
   | "inspection"
+  | "clarification_review"
+  | "clarification_response"
   | "recommendation_generation"
   | "remediation_preview"
   | "remediation_apply"
@@ -95,7 +97,35 @@ export type RemediationRecommendation = {
   proposed_action: string;
   confidence: number;
   human_approval_required: boolean;
+  assumptions: string[];
 };
+
+export type ClarificationStatus = "unanswered" | "answered" | "deferred";
+
+export type ClarificationQuestion = {
+  question_id: string;
+  related_finding: FindingReference;
+  question: string;
+  why_this_matters: string;
+  status: ClarificationStatus;
+  answer: string | null;
+  updated_at: string | null;
+};
+
+export type DatasetClarifications = {
+  dataset_id: string;
+  summary: {
+    total_count: number;
+    answered_count: number;
+    deferred_count: number;
+    unanswered_count: number;
+  };
+  questions: ClarificationQuestion[];
+};
+
+export type ClarificationActionResult =
+  | { ok: true; data: DatasetClarifications }
+  | { ok: false; message: string };
 
 export type RecommendationActionState = {
   status: "idle" | "success" | "configuration_error" | "error";
@@ -296,6 +326,8 @@ function isAuditEvent(value: unknown): value is AuditEvent {
 const auditActions = new Set<AuditAction>([
   "upload",
   "inspection",
+  "clarification_review",
+  "clarification_response",
   "recommendation_generation",
   "remediation_preview",
   "remediation_apply",
@@ -315,6 +347,22 @@ export function isRecommendationResponse(
   return (
     Array.isArray(candidate.recommendations) &&
     candidate.recommendations.every(isRemediationRecommendation)
+  );
+}
+
+export function isDatasetClarifications(
+  value: unknown,
+): value is DatasetClarifications {
+  if (!isRecord(value) || !isRecord(value.summary)) return false;
+  return (
+    typeof value.dataset_id === "string" &&
+    isDatasetIdentifier(value.dataset_id) &&
+    typeof value.summary.total_count === "number" &&
+    typeof value.summary.answered_count === "number" &&
+    typeof value.summary.deferred_count === "number" &&
+    typeof value.summary.unanswered_count === "number" &&
+    Array.isArray(value.questions) &&
+    value.questions.every(isClarificationQuestion)
   );
 }
 
@@ -400,7 +448,26 @@ function isRemediationRecommendation(
       typeof candidate.rationale === "string" &&
       typeof candidate.proposed_action === "string" &&
       typeof candidate.confidence === "number" &&
-      typeof candidate.human_approval_required === "boolean",
+      typeof candidate.human_approval_required === "boolean" &&
+      Array.isArray(candidate.assumptions) &&
+      candidate.assumptions.every((assumption) => typeof assumption === "string"),
+  );
+}
+
+function isClarificationQuestion(
+  value: unknown,
+): value is ClarificationQuestion {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.question_id === "string" &&
+    isFindingReference(value.related_finding) &&
+    typeof value.question === "string" &&
+    typeof value.why_this_matters === "string" &&
+    (value.status === "unanswered" ||
+      value.status === "answered" ||
+      value.status === "deferred") &&
+    (typeof value.answer === "string" || value.answer === null) &&
+    (typeof value.updated_at === "string" || value.updated_at === null)
   );
 }
 

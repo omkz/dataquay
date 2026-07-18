@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 
 import { generateRecommendations } from "@/app/actions/recommendations";
 import { notifyDatasetAuditUpdated } from "@/app/components/AuditTimeline";
+import { DATASET_CLARIFICATIONS_UPDATED_EVENT } from "@/app/components/ClarificationPanel";
 import {
   RemediationWorkflow,
   type ValidationBaseline,
@@ -33,6 +34,28 @@ export function RecommendationsPanel({
     generateRecommendations,
     initialState,
   );
+  const [clarificationsChanged, setClarificationsChanged] = useState(false);
+
+  useEffect(() => {
+    function handleClarificationUpdate(event: Event) {
+      if (
+        event instanceof CustomEvent &&
+        event.detail?.datasetId === datasetId &&
+        state.status === "success"
+      ) {
+        setClarificationsChanged(true);
+      }
+    }
+    window.addEventListener(
+      DATASET_CLARIFICATIONS_UPDATED_EVENT,
+      handleClarificationUpdate,
+    );
+    return () =>
+      window.removeEventListener(
+        DATASET_CLARIFICATIONS_UPDATED_EVENT,
+        handleClarificationUpdate,
+      );
+  }, [datasetId, state.status]);
 
   useEffect(() => {
     if (pending) {
@@ -48,6 +71,12 @@ export function RecommendationsPanel({
       notifyDatasetAuditUpdated(datasetId);
     }
     if (state.status === "success") {
+      reportWorkflowProgress(
+        datasetId,
+        "clarifications",
+        "complete",
+        "Available clarification context was included; unresolved context must remain labelled as AI assumptions.",
+      );
       reportWorkflowProgress(
         datasetId,
         "recommendations",
@@ -83,10 +112,14 @@ export function RecommendationsPanel({
           <h2 id="recommendations-title">Remediation recommendations</h2>
           <p className="section-description">
             Generate proposal-only guidance from the deterministic findings. No
-            dataset files will be changed.
+            dataset files will be changed. Saved clarification answers are
+            included as confirmed context for uploaded datasets.
           </p>
         </div>
-        <form action={formAction}>
+        <form
+          action={formAction}
+          onSubmit={() => setClarificationsChanged(false)}
+        >
           {datasetId ? (
             <input name="dataset_id" type="hidden" value={datasetId} />
           ) : null}
@@ -100,6 +133,8 @@ export function RecommendationsPanel({
                 <span className="button-spinner" aria-hidden="true" />
                 Generating…
               </>
+            ) : state.status === "success" && clarificationsChanged ? (
+              "Refresh with clarifications"
             ) : state.status === "success" ? (
               "Generate again"
             ) : (
@@ -108,6 +143,13 @@ export function RecommendationsPanel({
           </button>
         </form>
       </div>
+
+      {clarificationsChanged ? (
+        <div className="recommendation-context-notice" role="status">
+          Clarification context changed. Refresh recommendations to incorporate
+          the latest confirmed answers and unresolved questions.
+        </div>
+      ) : null}
 
       <div aria-live="polite">
         {pending ? (
@@ -388,6 +430,18 @@ function RecommendationCard({
           <div className="recommendation-rationale">
             <span>Rationale</span>
             <p>{recommendation.rationale}</p>
+          </div>
+          <div className="recommendation-assumptions">
+            <span>AI assumptions</span>
+            {recommendation.assumptions.length > 0 ? (
+              <ul>
+                {recommendation.assumptions.map((assumption, assumptionIndex) => (
+                  <li key={`${assumption}-${assumptionIndex}`}>{assumption}</li>
+                ))}
+              </ul>
+            ) : (
+              <p>No unresolved assumptions were declared for this proposal.</p>
+            )}
           </div>
           <div className="confidence-row">
             <span>Confidence</span>

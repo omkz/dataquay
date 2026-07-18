@@ -253,6 +253,7 @@ def test_recommendations_endpoint_returns_structured_agent_output(
         "proposed_action": "Verify the row before removing a copy.",
         "confidence": 0.95,
         "human_approval_required": True,
+        "assumptions": [],
     }
 
 
