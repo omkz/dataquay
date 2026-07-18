@@ -228,6 +228,7 @@ export function RemediationWorkflow({
 
       <div className="workflow-steps" aria-live="polite">
         <WorkflowStepCard
+          expanded={activeStep === "preview" || !previewComplete}
           number={1}
           title="Preview remediation"
           description="Classify approved proposals as automatic or manual before creating a working copy."
@@ -256,6 +257,7 @@ export function RemediationWorkflow({
         </WorkflowStepCard>
 
         <WorkflowStepCard
+          expanded={activeStep === "apply" || (previewComplete && !applyComplete)}
           number={2}
           title="Apply safe actions"
           description="Create a fresh working copy and apply only deterministic actions marked safe."
@@ -282,7 +284,9 @@ export function RemediationWorkflow({
         </WorkflowStepCard>
 
         <WorkflowStepCard
+          expanded={activeStep === "validate" || (applyComplete && !validationComplete)}
           number={3}
+          sectionId="validation"
           title="Validate working copy"
           description="Reinspect the output, compare findings, and verify source and output checksums."
           state={
@@ -311,7 +315,12 @@ export function RemediationWorkflow({
         </WorkflowStepCard>
 
         <WorkflowStepCard
+          expanded={
+            activeStep === "package" ||
+            (validationComplete && packageResult.status !== "success")
+          }
           number={4}
+          sectionId="package"
           title="Generate final package"
           description="Build documentation, metadata, manifests, checksums, validation report, provenance, and ZIP."
           state={
@@ -354,7 +363,9 @@ export function RemediationWorkflow({
 }
 
 function WorkflowStepCard({
+  expanded,
   number,
+  sectionId,
   title,
   description,
   state,
@@ -362,7 +373,9 @@ function WorkflowStepCard({
   prerequisite,
   children,
 }: {
+  expanded: boolean;
   number: number;
+  sectionId?: string;
   title: string;
   description: string;
   state: "idle" | "active" | "success" | "error";
@@ -371,12 +384,16 @@ function WorkflowStepCard({
   children: React.ReactNode;
 }) {
   return (
-    <article className={`workflow-step workflow-step-${state}`}>
-      <div className="workflow-step-header">
+    <details
+      className={`workflow-step workflow-step-${state} ${sectionId ? "section-anchor" : ""}`}
+      open={expanded}
+      id={sectionId}
+      key={`${number}-${state}-${expanded}`}
+    >
+      <summary className="workflow-step-header">
         <span className="workflow-step-number">{number}</span>
         <div>
           <h4>{title}</h4>
-          <p>{description}</p>
         </div>
         <span className={`workflow-step-status status-${state}`}>
           {state === "success"
@@ -387,20 +404,23 @@ function WorkflowStepCard({
                 ? "Processing"
                 : "Waiting"}
         </span>
+      </summary>
+      <div className="workflow-step-content">
+        <p className="workflow-step-description">{description}</p>
+        <div className="workflow-step-action">
+          {prerequisite ? (
+            <div className="workflow-prerequisite">
+              <strong>Before you continue</strong>
+              <span>{prerequisite}</span>
+            </div>
+          ) : (
+            <span />
+          )}
+          {action}
+        </div>
+        {children ? <div className="workflow-step-result">{children}</div> : null}
       </div>
-      <div className="workflow-step-action">
-        {prerequisite ? (
-          <div className="workflow-prerequisite">
-            <strong>Before you continue</strong>
-            <span>{prerequisite}</span>
-          </div>
-        ) : (
-          <span />
-        )}
-        {action}
-      </div>
-      {children ? <div className="workflow-step-result">{children}</div> : null}
-    </article>
+    </details>
   );
 }
 

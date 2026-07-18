@@ -105,7 +105,11 @@ export function RecommendationsPanel({
   }, [datasetId, pending, state]);
 
   return (
-    <section className="content-section" aria-labelledby="recommendations-title">
+    <section
+      className="content-section section-anchor"
+      id="recommendations"
+      aria-labelledby="recommendations-title"
+    >
       <div className="section-heading recommendation-heading">
         <div>
           <p className="section-kicker">Data Steward Agent</p>
@@ -253,7 +257,7 @@ function RecommendationReview({
           <RecommendationCard
             decision={item.decision}
             index={item.index + 1}
-            key={item.id}
+            key={`${item.id}-${item.decision}`}
             onDecision={(decision) => updateDecision(item.id, decision)}
             recommendation={item.recommendation}
           />
@@ -389,39 +393,49 @@ function RecommendationCard({
   const finding = recommendation.related_finding;
 
   return (
-    <article className="recommendation-card">
-      <div className="recommendation-card-topline">
-        <span className="recommendation-index">
-          Recommendation {String(index).padStart(2, "0")}
+    <details
+      className={`recommendation-card recommendation-decision-${decision}`}
+      open={decision === "pending"}
+    >
+      <summary className="recommendation-card-summary">
+        <span className="recommendation-card-topline">
+          <span className="recommendation-index">
+            Recommendation {String(index).padStart(2, "0")}
+          </span>
+          <span
+            className={`approval-badge ${
+              recommendation.human_approval_required ? "required" : "not-required"
+            }`}
+          >
+            {recommendation.human_approval_required
+              ? "Human approval required"
+              : "No approval required"}
+          </span>
         </span>
-        <span
-          className={`approval-badge ${
-            recommendation.human_approval_required ? "required" : "not-required"
-          }`}
-        >
-          {recommendation.human_approval_required
-            ? "Human approval required"
-            : "No approval required"}
+        <span className="recommendation-summary-title">
+          {recommendation.short_title}
         </span>
-      </div>
+        <span className={`recommendation-summary-decision decision-${decision}`}>
+          {formatLabel(decision)}
+        </span>
+      </summary>
 
-      <h3>{recommendation.short_title}</h3>
-
-      <div className="related-finding">
+      <div className="recommendation-card-content">
+        <div className="related-finding">
         <span>Related finding</span>
         <strong>{formatLabel(finding.type)}</strong>
         <code>
           {finding.file}
           {finding.affected_column ? ` / ${finding.affected_column}` : ""}
         </code>
-      </div>
+        </div>
 
-      <div className="recommendation-primary-action">
+        <div className="recommendation-primary-action">
         <span>Proposed action</span>
         <p>{recommendation.proposed_action}</p>
-      </div>
+        </div>
 
-      <details className="recommendation-details">
+        <details className="recommendation-details">
         <summary>
           <span>View rationale and confidence</span>
           <small>{confidence}% confidence</small>
@@ -458,9 +472,9 @@ function RecommendationCard({
             <strong>{confidence}%</strong>
           </div>
         </div>
-      </details>
+        </details>
 
-      <div className="decision-row">
+        <div className="decision-row">
         <div className="current-decision">
           <span>Current decision</span>
           <strong className={`decision-label decision-${decision}`}>
@@ -484,8 +498,9 @@ function RecommendationCard({
             </button>
           ))}
         </div>
+        </div>
       </div>
-    </article>
+    </details>
   );
 }
 
@@ -503,7 +518,7 @@ function ApprovedRemediationPlan({
   validationBaseline: ValidationBaseline;
 }) {
   return (
-    <section className="approved-plan" aria-labelledby="approved-plan-title">
+    <section className="approved-plan section-anchor" id="remediation" aria-labelledby="approved-plan-title">
       <div className="approved-plan-heading">
         <div>
           <p className="section-kicker">Human-reviewed proposals</p>

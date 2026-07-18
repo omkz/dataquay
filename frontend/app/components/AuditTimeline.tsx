@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   isDatasetAuditTrail,
   type AuditAction,
+  type AuditEvent,
   type DatasetAuditTrail,
 } from "@/lib/dataquay";
 
@@ -73,7 +74,7 @@ export function AuditTimeline({ datasetId }: { datasetId: string }) {
   }, [datasetId, loadAudit]);
 
   return (
-    <section className="content-section" aria-labelledby="audit-title">
+    <section className="content-section section-anchor" id="audit" aria-labelledby="audit-title">
       <div className="section-heading audit-heading">
         <div>
           <p className="section-kicker">Append-only history</p>
@@ -107,31 +108,59 @@ export function AuditTimeline({ datasetId }: { datasetId: string }) {
             <p>Workflow activity will appear here as it occurs.</p>
           </div>
         ) : (
-          <ol className="audit-timeline">
-            {[...state.trail.events].reverse().map((event, index) => (
-              <li key={`${event.timestamp}-${event.action}-${index}`}>
-                <span
-                  className={`audit-marker audit-marker-${event.status}`}
-                  aria-hidden="true"
-                />
-                <div className="audit-event">
-                  <div className="audit-event-topline">
-                    <strong>{actionLabels[event.action]}</strong>
-                    <span className={`audit-status audit-status-${event.status}`}>
-                      {event.status}
-                    </span>
-                  </div>
-                  <p>{event.summary}</p>
-                  <time dateTime={event.timestamp}>
-                    {formatTimestamp(event.timestamp)}
-                  </time>
-                </div>
-              </li>
-            ))}
-          </ol>
+          <AuditHistory events={state.trail.events} />
         )}
       </div>
     </section>
+  );
+}
+
+function AuditHistory({ events }: { events: AuditEvent[] }) {
+  const newestFirst = [...events].reverse();
+  return (
+    <div className="audit-history">
+      <div className="audit-recent-heading">
+        <strong>Recent activity</strong>
+        <span>Latest {Math.min(3, events.length)} events</span>
+      </div>
+      <AuditEventList events={newestFirst.slice(0, 3)} />
+      <details className="audit-full-history">
+        <summary>
+          <span>Open full audit trail</span>
+          <strong>{events.length} events</strong>
+        </summary>
+        <div className="audit-full-history-content">
+          <AuditEventList events={newestFirst} />
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function AuditEventList({ events }: { events: AuditEvent[] }) {
+  return (
+    <ol className="audit-timeline">
+      {events.map((event, index) => (
+        <li key={`${event.timestamp}-${event.action}-${index}`}>
+          <span
+            className={`audit-marker audit-marker-${event.status}`}
+            aria-hidden="true"
+          />
+          <div className="audit-event">
+            <div className="audit-event-topline">
+              <strong>{actionLabels[event.action]}</strong>
+              <span className={`audit-status audit-status-${event.status}`}>
+                {event.status}
+              </span>
+            </div>
+            <p>{event.summary}</p>
+            <time dateTime={event.timestamp}>
+              {formatTimestamp(event.timestamp)}
+            </time>
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }
 

@@ -87,7 +87,11 @@ export function ClarificationPanel({ datasetId }: { datasetId: string }) {
   }
 
   return (
-    <section className="content-section" aria-labelledby="clarification-title">
+    <section
+      className="content-section section-anchor"
+      id="clarifications"
+      aria-labelledby="clarification-title"
+    >
       <div className="section-heading clarification-heading">
         <div>
           <p className="section-kicker">Research context</p>
@@ -135,7 +139,7 @@ export function ClarificationPanel({ datasetId }: { datasetId: string }) {
                 isPending={
                   isPending && activeQuestion === question.question_id
                 }
-                key={question.question_id}
+                key={`${question.question_id}-${question.status}`}
                 onAnswer={() => updateQuestion(question, "answer")}
                 onDefer={() => updateQuestion(question, "defer")}
                 onDraftChange={(value) =>
@@ -232,38 +236,44 @@ function ClarificationCard({
   question: ClarificationQuestion;
 }) {
   return (
-    <article className={`clarification-card clarification-${question.status}`}>
-      <div className="clarification-card-topline">
-        <span>Question {String(index).padStart(2, "0")}</span>
-        <strong>{statusLabels[question.status]}</strong>
-      </div>
-      <h3>{question.question}</h3>
-      <div className="clarification-location">
-        <span>{formatLabel(question.related_finding.type)}</span>
-        <code>
-          {question.related_finding.file}
-          {question.related_finding.affected_column
-            ? ` / ${question.related_finding.affected_column}`
-            : ""}
-        </code>
-      </div>
-      <details className="clarification-why">
-        <summary>Why this context is needed</summary>
-        <p>{question.why_this_matters}</p>
-      </details>
+    <details
+      className={`clarification-card clarification-${question.status}`}
+      open={question.status === "unanswered"}
+    >
+      <summary className="clarification-card-summary">
+        <span className="clarification-card-topline">
+          <span>Question {String(index).padStart(2, "0")}</span>
+          <strong>{statusLabels[question.status]}</strong>
+        </span>
+        <span className="clarification-question-text">{question.question}</span>
+        <span className="clarification-location">
+          <span>{formatLabel(question.related_finding.type)}</span>
+          <code>
+            {question.related_finding.file}
+            {question.related_finding.affected_column
+              ? ` / ${question.related_finding.affected_column}`
+              : ""}
+          </code>
+        </span>
+      </summary>
+      <div className="clarification-card-content">
+        <details className="clarification-why">
+          <summary>Why this context is needed</summary>
+          <p>{question.why_this_matters}</p>
+        </details>
 
-      {question.status === "answered" && question.answer ? (
-        <div className="confirmed-information">
-          <span>Confirmed information</span>
-          <p>{question.answer}</p>
-        </div>
-      ) : question.status === "deferred" ? (
-        <div className="deferred-information">
-          Deferred by the reviewer. This remains unknown until answered.
-        </div>
-      ) : null}
+        {question.status === "answered" && question.answer ? (
+          <div className="confirmed-information">
+            <span>Confirmed information</span>
+            <p>{question.answer}</p>
+          </div>
+        ) : question.status === "deferred" ? (
+          <div className="deferred-information">
+            Deferred by the reviewer. This remains unknown until answered.
+          </div>
+        ) : null}
 
-      <label className="clarification-answer">
+        <label className="clarification-answer">
         <span>
           {question.status === "answered" ? "Update answer" : "Your answer"}
         </span>
@@ -275,8 +285,8 @@ function ClarificationCard({
           rows={3}
           value={draft}
         />
-      </label>
-      <div className="clarification-actions">
+        </label>
+        <div className="clarification-actions">
         <button
           className="clarification-answer-button"
           disabled={isPending}
@@ -293,8 +303,9 @@ function ClarificationCard({
         >
           {question.status === "deferred" ? "Deferred" : "Defer question"}
         </button>
+        </div>
       </div>
-    </article>
+    </details>
   );
 }
 

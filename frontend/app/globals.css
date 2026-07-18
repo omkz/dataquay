@@ -555,7 +555,7 @@ a {
 
 .workflow-progress-list {
   display: grid;
-  grid-template-columns: repeat(7, minmax(104px, 1fr));
+  grid-template-columns: repeat(8, minmax(104px, 1fr));
   margin: 24px 0 0;
   padding: 0;
   overflow-x: auto;
@@ -714,6 +714,72 @@ a {
   color: var(--high);
 }
 
+.section-navigator {
+  position: sticky;
+  z-index: 20;
+  top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 22px;
+  padding: 8px 10px;
+  border: 1px solid #cbd8d2;
+  border-radius: 12px;
+  background: rgb(250 252 251 / 94%);
+  box-shadow: 0 10px 30px rgb(23 33 29 / 10%);
+  backdrop-filter: blur(12px);
+}
+
+.section-navigator-label {
+  flex: none;
+  padding-left: 4px;
+  color: #74817a;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.section-navigator-links {
+  display: flex;
+  min-width: 0;
+  gap: 3px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.section-navigator button {
+  min-height: 32px;
+  flex: none;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #64716b;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.section-navigator button:hover {
+  background: #edf3f0;
+  color: var(--ink);
+}
+
+.section-navigator button[aria-current="location"] {
+  background: var(--brand);
+  color: white;
+}
+
+.section-navigator button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.section-anchor {
+  scroll-margin-top: 78px;
+}
+
 .readiness-panel {
   display: flex;
   align-items: stretch;
@@ -849,6 +915,49 @@ a {
 
 .content-section {
   margin-top: 64px;
+}
+
+.secondary-section {
+  margin-top: 34px;
+}
+
+.secondary-section > details {
+  padding: 15px 17px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgb(255 255 255 / 58%);
+}
+
+.secondary-section .section-heading {
+  margin: 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.secondary-section .section-heading::-webkit-details-marker {
+  display: none;
+}
+
+.secondary-section .section-heading::before {
+  align-self: center;
+  order: 3;
+  color: #7b8781;
+  content: "+";
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.secondary-section details[open] .section-heading::before {
+  content: "−";
+}
+
+.secondary-section .section-heading h2 {
+  font-size: 18px;
+}
+
+.secondary-section-content {
+  margin-top: 15px;
 }
 
 .section-heading {
@@ -1482,11 +1591,44 @@ tbody tr:last-child td {
 }
 
 .clarification-card {
-  padding: 18px 20px;
+  overflow: hidden;
   border: 1px solid #dce5e1;
   border-left: 3px solid var(--medium);
   border-radius: 12px;
   background: white;
+}
+
+.clarification-card-summary {
+  position: relative;
+  display: grid;
+  gap: 9px;
+  padding: 16px 45px 16px 18px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.clarification-card-summary::-webkit-details-marker {
+  display: none;
+}
+
+.clarification-card-summary::after {
+  position: absolute;
+  top: 17px;
+  right: 18px;
+  color: #75827b;
+  content: "+";
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.clarification-card[open] > .clarification-card-summary::after {
+  content: "−";
+}
+
+.clarification-card-content {
+  padding: 0 18px 18px;
+  border-top: 1px solid #e5ebe8;
 }
 
 .clarification-answered {
@@ -1532,9 +1674,9 @@ tbody tr:last-child td {
   color: #68756e;
 }
 
-.clarification-card h3 {
+.clarification-question-text {
+  display: block;
   max-width: 900px;
-  margin: 12px 0 10px;
   font-size: 14px;
   font-weight: 620;
   line-height: 1.55;
@@ -1829,13 +1971,69 @@ tbody tr:last-child td {
 }
 
 .recommendation-card {
-  padding: 20px 22px;
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 15px;
   background:
     linear-gradient(135deg, rgb(223 241 233 / 22%), transparent 42%),
     var(--surface);
   box-shadow: 0 10px 32px rgb(23 33 29 / 4%);
+}
+
+.recommendation-decision-approved {
+  border-color: #bfd8cd;
+}
+
+.recommendation-decision-rejected {
+  border-color: #e3c7c1;
+}
+
+.recommendation-card-summary {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  padding: 18px 50px 17px 20px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.recommendation-card-summary::-webkit-details-marker {
+  display: none;
+}
+
+.recommendation-card-summary::after {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  color: #77847d;
+  content: "+";
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.recommendation-card[open] > .recommendation-card-summary::after {
+  content: "−";
+}
+
+.recommendation-summary-title {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.recommendation-summary-decision {
+  width: fit-content;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.recommendation-card-content {
+  padding: 0 20px 20px;
+  border-top: 1px solid #e5ebe8;
 }
 
 .recommendation-card-topline {
@@ -2366,9 +2564,25 @@ tbody tr:last-child td {
 .workflow-step-header {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto;
-  align-items: start;
+  align-items: center;
   gap: 12px;
-  padding: 17px 18px 12px;
+  padding: 14px 18px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.workflow-step-header::-webkit-details-marker {
+  display: none;
+}
+
+.workflow-step-status::after {
+  margin-left: 5px;
+  content: "+";
+  font-family: var(--font-geist-mono), monospace;
+}
+
+.workflow-step[open] .workflow-step-status::after {
+  content: "−";
 }
 
 .workflow-step-number {
@@ -2404,9 +2618,10 @@ tbody tr:last-child td {
   font-size: 13px;
 }
 
-.workflow-step-header p {
+.workflow-step-description {
   max-width: 680px;
   margin: 0;
+  padding: 0 18px 12px 64px;
   color: var(--muted);
   font-size: 10px;
   line-height: 1.55;
@@ -2444,6 +2659,11 @@ tbody tr:last-child td {
   justify-content: space-between;
   gap: 18px;
   padding: 0 18px 17px 64px;
+}
+
+.workflow-step-content {
+  border-top: 1px solid #e7ece9;
+  padding-top: 13px;
 }
 
 .workflow-prerequisite {
@@ -3068,6 +3288,80 @@ tbody tr:last-child td {
   opacity: 0.55;
 }
 
+.audit-history {
+  display: grid;
+  gap: 12px;
+}
+
+.audit-recent-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 900px;
+  gap: 12px;
+}
+
+.audit-recent-heading strong {
+  color: #46534d;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.audit-recent-heading span {
+  color: #829089;
+  font-size: 9px;
+}
+
+.audit-full-history {
+  max-width: 900px;
+  overflow: hidden;
+  border: 1px solid #d7e1dc;
+  border-radius: 11px;
+  background: rgb(255 255 255 / 64%);
+}
+
+.audit-full-history > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  color: var(--brand-dark);
+  cursor: pointer;
+  list-style: none;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.audit-full-history > summary::-webkit-details-marker {
+  display: none;
+}
+
+.audit-full-history > summary::before {
+  content: "+";
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+}
+
+.audit-full-history[open] > summary::before {
+  content: "−";
+}
+
+.audit-full-history > summary > span {
+  margin-right: auto;
+}
+
+.audit-full-history > summary strong {
+  color: #7b8781;
+  font-size: 9px;
+}
+
+.audit-full-history-content {
+  padding: 14px 14px 0;
+  border-top: 1px solid #e1e8e4;
+  background: #f8faf9;
+}
+
 .audit-timeline {
   display: grid;
   max-width: 900px;
@@ -3442,6 +3736,16 @@ tbody tr:last-child td {
     padding-right: 20px;
   }
 
+  .section-navigator {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .section-navigator-label {
+    padding: 0 3px;
+  }
+
   .readiness-metrics {
     min-width: 0;
   }
@@ -3626,6 +3930,17 @@ tbody tr:last-child td {
     gap: 8px;
   }
 
+  .secondary-section .section-heading {
+    position: relative;
+    padding-right: 24px;
+  }
+
+  .secondary-section .section-heading::before {
+    position: absolute;
+    top: 4px;
+    right: 2px;
+  }
+
   .finding-card {
     grid-template-columns: 1fr;
   }
@@ -3660,7 +3975,15 @@ tbody tr:last-child td {
   }
 
   .clarification-card {
-    padding: 17px;
+    padding: 0;
+  }
+
+  .clarification-card-summary {
+    padding: 15px 40px 15px 15px;
+  }
+
+  .clarification-card-content {
+    padding: 0 15px 15px;
   }
 
   .clarification-actions {
@@ -3669,7 +3992,15 @@ tbody tr:last-child td {
   }
 
   .recommendation-card {
-    padding: 20px;
+    padding: 0;
+  }
+
+  .recommendation-card-summary {
+    padding: 16px 40px 15px 16px;
+  }
+
+  .recommendation-card-content {
+    padding: 0 16px 16px;
   }
 
   .recommendation-card-topline,

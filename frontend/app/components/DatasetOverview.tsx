@@ -4,6 +4,7 @@ import { AuditTimeline } from "@/app/components/AuditTimeline";
 import { ClarificationPanel } from "@/app/components/ClarificationPanel";
 import { FindingsExplorer } from "@/app/components/FindingsExplorer";
 import { RecommendationsPanel } from "@/app/components/RecommendationsPanel";
+import { SectionNavigator } from "@/app/components/SectionNavigator";
 import { WorkflowStepper } from "@/app/components/WorkflowStepper";
 import type {
   DatasetInspection,
@@ -72,6 +73,7 @@ export function DatasetOverview({
         </section>
 
         <WorkflowStepper datasetId={datasetId} />
+        <SectionNavigator uploaded={Boolean(datasetId)} />
 
         <section className="readiness-panel" aria-labelledby="readiness-title">
           <div className="readiness-copy">
@@ -122,17 +124,18 @@ export function DatasetOverview({
           />
         </section>
 
-        <section className="content-section" aria-labelledby="severity-title">
-          <div className="section-heading">
-            <div>
-              <p className="section-kicker">Risk distribution</p>
-              <h2 id="severity-title">Findings by severity</h2>
-            </div>
-            <span className="section-meta">
-              {readiness.total_finding_count} total
-            </span>
-          </div>
-          <div className="severity-grid">
+        <section className="content-section secondary-section" aria-labelledby="severity-title">
+          <details>
+            <summary className="section-heading">
+              <div>
+                <p className="section-kicker">Risk distribution</p>
+                <h2 id="severity-title">Findings by severity</h2>
+              </div>
+              <span className="section-meta">
+                {readiness.total_finding_count} total · Expand
+              </span>
+            </summary>
+            <div className="secondary-section-content severity-grid">
             {severityEntries.length > 0 ? (
               severityEntries.map(([severity, count]) => (
                 <div className="severity-card" key={severity}>
@@ -148,18 +151,20 @@ export function DatasetOverview({
                 No findings were detected in this dataset.
               </div>
             )}
-          </div>
+            </div>
+          </details>
         </section>
 
-        <section className="content-section" aria-labelledby="files-title">
-          <div className="section-heading">
-            <div>
-              <p className="section-kicker">Inventory</p>
-              <h2 id="files-title">Dataset files</h2>
-            </div>
-            <span className="section-meta">{files.length} files</span>
-          </div>
-          <div className="table-frame">
+        <section className="content-section secondary-section" aria-labelledby="files-title">
+          <details>
+            <summary className="section-heading">
+              <div>
+                <p className="section-kicker">Inventory</p>
+                <h2 id="files-title">Dataset files</h2>
+              </div>
+              <span className="section-meta">{files.length} files · Expand</span>
+            </summary>
+            <div className="secondary-section-content table-frame">
             <table>
               <thead>
                 <tr>
@@ -175,10 +180,11 @@ export function DatasetOverview({
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+          </details>
         </section>
 
-        <section className="content-section" aria-labelledby="findings-title">
+        <section className="content-section section-anchor" id="findings" aria-labelledby="findings-title">
           <div className="section-heading">
             <div>
               <p className="section-kicker">Evidence</p>
