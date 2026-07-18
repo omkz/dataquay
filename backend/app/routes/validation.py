@@ -10,6 +10,7 @@ from app.services.remediation_validation import (
     ValidationUnavailableError,
     validate_remediated_dataset,
 )
+from app.services.workflow_repository import update_workspace_readiness
 
 router = APIRouter(prefix="/api/validate", tags=["validation"])
 
@@ -86,4 +87,5 @@ def validate_uploaded_dataset_remediation(
             f"readiness as {validation.readiness.status.value}."
         ),
     )
+    update_workspace_readiness(dataset_id, validation.readiness)
     return validation

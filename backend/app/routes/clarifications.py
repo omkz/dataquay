@@ -11,6 +11,7 @@ from app.services.clarifications import (
     ClarificationError,
     ClarificationQuestionNotFoundError,
     get_dataset_clarifications,
+    store_dataset_clarifications,
     update_dataset_clarification,
 )
 from app.services.dataset_workspace import (
@@ -18,6 +19,11 @@ from app.services.dataset_workspace import (
     inspect_dataset_workspace,
 )
 from app.services.dataset_workflow import resolve_dataset_workflow_workspace
+from app.services.workflow_repository import (
+    PersistenceError,
+    save_clarification_response,
+    sync_clarifications,
+)
 
 router = APIRouter(prefix="/api/clarify", tags=["clarifications"])
 
@@ -27,15 +33,17 @@ def get_uploaded_dataset_clarifications(dataset_id: str) -> DatasetClarification
     try:
         workflow = resolve_dataset_workflow_workspace(dataset_id)
         inspection = inspect_dataset_workspace(dataset_id)
-        clarifications = get_dataset_clarifications(
+        generated = get_dataset_clarifications(
             workflow.workspace_directory,
             dataset_id=dataset_id,
             findings=inspection.findings,
         )
+        clarifications = sync_clarifications(generated)
+        store_dataset_clarifications(workflow.workspace_directory, clarifications)
     except DatasetNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ClarificationError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except (ClarificationError, PersistenceError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     append_audit_event(
         workflow.workspace_directory,
@@ -68,13 +76,32 @@ def update_uploaded_dataset_clarification(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     try:
-        clarifications = update_dataset_clarification(
+        generated = get_dataset_clarifications(
+            workflow.workspace_directory,
+            dataset_id=dataset_id,
+            findings=inspection.findings,
+        )
+        synced = sync_clarifications(generated)
+        store_dataset_clarifications(workflow.workspace_directory, synced)
+        updated = update_dataset_clarification(
             workflow.workspace_directory,
             dataset_id=dataset_id,
             findings=inspection.findings,
             question_id=question_id,
             update=request,
         )
+        updated_question = next(
+            question
+            for question in updated.questions
+            if question.question_id == question_id
+        )
+        clarifications = save_clarification_response(
+            dataset_id,
+            question_id=question_id,
+            status=updated_question.status,
+            answer=updated_question.answer,
+        )
+        store_dataset_clarifications(workflow.workspace_directory, clarifications)
     except ClarificationQuestionNotFoundError as exc:
         append_audit_event(
             workflow.workspace_directory,
@@ -84,6 +111,8 @@ def update_uploaded_dataset_clarification(
             summary="A clarification response was rejected because the question was not found.",
         )
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PersistenceError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ClarificationError as exc:
         append_audit_event(
             workflow.workspace_directory,

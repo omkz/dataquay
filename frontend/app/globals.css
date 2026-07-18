@@ -1133,6 +1133,130 @@ tbody tr:last-child td {
   color: var(--ink);
 }
 
+.workspace-history {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: white;
+}
+
+.workspace-history-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.workspace-history-heading h2 {
+  margin: 3px 0 6px;
+  font-size: clamp(20px, 3vw, 28px);
+}
+
+.workspace-history-heading p,
+.workspace-history-error p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.workspace-history-heading > span,
+.workspace-status {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.workspace-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.workspace-card {
+  display: grid;
+  gap: 14px;
+  padding: 17px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+
+.workspace-card:hover {
+  border-color: var(--brand);
+  transform: translateY(-1px);
+}
+
+.workspace-card h3 {
+  margin: 10px 0 3px;
+  font-size: 17px;
+}
+
+.workspace-card p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.workspace-card dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.workspace-card dl div {
+  display: grid;
+  gap: 2px;
+}
+
+.workspace-card dt {
+  color: var(--muted);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.workspace-card dd {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.workspace-open {
+  color: var(--brand-dark);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.workspace-history-error,
+.workspace-history-empty,
+.decision-save-error,
+.workflow-restored {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #f8faf9;
+}
+
+.workspace-history-error,
+.decision-save-error {
+  border-color: #e5c9c3;
+  background: #fff8f6;
+}
+
+.decision-save-error p,
+.workflow-restored p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .inventory-only {
   font-style: italic;
 }

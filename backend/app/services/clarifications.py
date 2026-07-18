@@ -131,6 +131,14 @@ def update_dataset_clarification(
     return result
 
 
+def store_dataset_clarifications(
+    workspace_directory: str | Path,
+    clarifications: DatasetClarifications,
+) -> None:
+    """Write a compatibility snapshot after PostgreSQL state is committed."""
+    _write_clarifications(Path(workspace_directory).resolve(), clarifications)
+
+
 def _question_for_finding(finding: InspectionFinding) -> ClarificationQuestion:
     location = _finding_location(finding)
     if finding.type == FindingType.MISSING_REFERENCE:

@@ -10,6 +10,7 @@ import type {
   DatasetInspection,
   InspectedFile,
   ReadinessStatus,
+  WorkspaceDetail,
 } from "@/lib/dataquay";
 
 const readinessLabels: Record<ReadinessStatus, string> = {
@@ -24,10 +25,12 @@ export function DatasetOverview({
   inspection,
   mode,
   datasetId,
+  workspace,
 }: {
   inspection: DatasetInspection;
   mode: "sample" | "uploaded";
   datasetId?: string;
+  workspace?: WorkspaceDetail;
 }) {
   const { summary, readiness, files, findings } = inspection;
   const nonCsvFileCount = summary.total_file_count - summary.csv_file_count;
@@ -199,6 +202,7 @@ export function DatasetOverview({
 
         <RecommendationsPanel
           datasetId={datasetId}
+          persistedWorkspace={workspace}
           validationBaseline={{
             blockerCount: readiness.blocker_count,
             readinessStatus: readiness.status,

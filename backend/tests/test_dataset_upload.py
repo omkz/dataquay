@@ -7,8 +7,12 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 from fastapi.testclient import TestClient
 import pytest
+from sqlalchemy import event, func, select
+from sqlalchemy.exc import SQLAlchemyError
 
+from app.database import session_scope
 from app.main import app
+from app.models import DatasetRecord, Workspace
 
 client = TestClient(app)
 
@@ -123,6 +127,53 @@ def test_upload_preserves_archive_and_originals_then_inspects_by_identifier(
     serialized_audit = audit_response.text
     assert "P001" not in serialized_audit
     assert "participant_id,value" not in serialized_audit
+
+
+def test_upload_persists_parent_before_dataset_record(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage_root = tmp_path / "datasets"
+    monkeypatch.setenv("DATAQUAY_DATA_ROOT", str(storage_root))
+
+    response = _upload(_zip_bytes({"data.csv": b"id,value\n1,2\n"}))
+
+    assert response.status_code == 201
+    dataset_id = UUID(response.json()["dataset_id"])
+    with session_scope() as session:
+        workspace = session.get(Workspace, dataset_id)
+        dataset = session.get(DatasetRecord, dataset_id)
+        assert workspace is not None
+        assert dataset is not None
+        assert dataset.workspace_id == workspace.id
+
+
+def test_upload_persistence_failure_rolls_back_and_removes_workspace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage_root = tmp_path / "datasets"
+    monkeypatch.setenv("DATAQUAY_DATA_ROOT", str(storage_root))
+
+    def fail_dataset_insert(*_args) -> None:
+        raise SQLAlchemyError("forced dataset metadata failure")
+
+    event.listen(DatasetRecord, "before_insert", fail_dataset_insert)
+    try:
+        response = _upload(_zip_bytes({"data.csv": b"id,value\n1,2\n"}))
+    finally:
+        event.remove(DatasetRecord, "before_insert", fail_dataset_insert)
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "The dataset workspace metadata could not be persisted. "
+        "Confirm that PostgreSQL is available and migrations are current."
+    )
+    assert storage_root.is_dir()
+    assert list(storage_root.iterdir()) == []
+    with session_scope() as session:
+        assert session.scalar(select(func.count()).select_from(Workspace)) == 0
+        assert session.scalar(select(func.count()).select_from(DatasetRecord)) == 0
 
 
 @pytest.mark.parametrize(

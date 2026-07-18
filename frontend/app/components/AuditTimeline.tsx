@@ -208,6 +208,7 @@ const actionLabels: Record<AuditAction, string> = {
   clarification_review: "Clarification review",
   clarification_response: "Clarification response",
   recommendation_generation: "Recommendation generation",
+  human_decision: "Human review decision",
   remediation_preview: "Remediation preview",
   remediation_apply: "Remediation apply",
   validation: "Working-copy validation",

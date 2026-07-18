@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 
 import { generateRecommendations } from "@/app/actions/recommendations";
+import { saveRecommendationDecision } from "@/app/actions/workspaces";
 import { notifyDatasetAuditUpdated } from "@/app/components/AuditTimeline";
 import { DATASET_CLARIFICATIONS_UPDATED_EVENT } from "@/app/components/ClarificationPanel";
 import {
@@ -12,7 +13,9 @@ import {
 import { reportWorkflowProgress } from "@/app/components/WorkflowStepper";
 import type {
   RecommendationActionState,
+  RecommendationDecision,
   RemediationRecommendation,
+  WorkspaceDetail,
 } from "@/lib/dataquay";
 
 const initialState: RecommendationActionState = {
@@ -21,18 +24,25 @@ const initialState: RecommendationActionState = {
   generation: 0,
 };
 
-type RecommendationDecision = "pending" | "approved" | "rejected";
-
 export function RecommendationsPanel({
   datasetId,
   validationBaseline,
+  persistedWorkspace,
 }: {
   datasetId?: string;
   validationBaseline: ValidationBaseline;
+  persistedWorkspace?: WorkspaceDetail;
 }) {
+  const restoredState: RecommendationActionState = persistedWorkspace?.recommendations_generated
+    ? {
+        status: "success",
+        recommendations: persistedWorkspace.recommendations,
+        generation: 1,
+      }
+    : initialState;
   const [state, formAction, pending] = useActionState(
     generateRecommendations,
-    initialState,
+    restoredState,
   );
   const [clarificationsChanged, setClarificationsChanged] = useState(false);
 
@@ -177,8 +187,10 @@ export function RecommendationsPanel({
         ) : (
           <RecommendationReview
             datasetId={datasetId}
+            initialDecisions={persistedWorkspace?.decisions ?? {}}
             key={state.generation}
             recommendations={state.recommendations}
+            workflowStatus={persistedWorkspace?.workflow_status}
             validationBaseline={validationBaseline}
           />
         )}
@@ -190,17 +202,23 @@ export function RecommendationsPanel({
 function RecommendationReview({
   recommendations,
   datasetId,
+  initialDecisions,
+  workflowStatus,
   validationBaseline,
 }: {
   recommendations: RemediationRecommendation[];
   datasetId?: string;
+  initialDecisions: Record<string, RecommendationDecision>;
+  workflowStatus?: string;
   validationBaseline: ValidationBaseline;
 }) {
   const [decisions, setDecisions] = useState<
     Record<string, RecommendationDecision>
-  >({});
+  >(initialDecisions);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [savingDecision, startDecisionTransition] = useTransition();
   const reviewedRecommendations = recommendations.map((recommendation, index) => {
-    const id = getRecommendationId(recommendation, index);
+    const id = getRecommendationId(index);
     return {
       id,
       recommendation,
@@ -245,12 +263,33 @@ function RecommendationReview({
   }, [datasetId, decisionCounts.approved, decisionCounts.pending]);
 
   function updateDecision(id: string, decision: RecommendationDecision) {
+    const previousDecision = decisions[id] ?? "pending";
+    setDecisionError(null);
     setDecisions((current) => ({ ...current, [id]: decision }));
+    if (!datasetId) return;
+
+    startDecisionTransition(async () => {
+      const result = await saveRecommendationDecision(datasetId, id, decision);
+      if (result.ok) {
+        setDecisions(result.decisions);
+        notifyDatasetAuditUpdated(datasetId);
+        return;
+      }
+      setDecisions((current) => ({ ...current, [id]: previousDecision }));
+      setDecisionError(result.message);
+    });
   }
 
   return (
     <div className="recommendation-review">
       <ReviewSummary counts={decisionCounts} />
+
+      {decisionError ? (
+        <div className="decision-save-error" role="alert">
+          <strong>Decision not saved</strong>
+          <p>{decisionError}</p>
+        </div>
+      ) : null}
 
       <div className="recommendation-list">
         {reviewedRecommendations.map((item) => (
@@ -258,6 +297,7 @@ function RecommendationReview({
             decision={item.decision}
             index={item.index + 1}
             key={`${item.id}-${item.decision}`}
+            saving={savingDecision}
             onDecision={(decision) => updateDecision(item.id, decision)}
             recommendation={item.recommendation}
           />
@@ -267,6 +307,7 @@ function RecommendationReview({
       <ApprovedRemediationPlan
         datasetId={datasetId}
         items={approvedRecommendations}
+        workflowStatus={workflowStatus}
         validationBaseline={validationBaseline}
       />
     </div>
@@ -285,7 +326,7 @@ function ReviewSummary({
           <span>Review progress</span>
           <strong>Current decisions</strong>
         </div>
-        <small>Kept on this page only</small>
+        <small>Saved to this workspace</small>
       </div>
       <div className="review-counts">
         <ReviewCount decision="approved" count={counts.approved} />
@@ -383,11 +424,13 @@ function RecommendationCard({
   index,
   decision,
   onDecision,
+  saving,
 }: {
   recommendation: RemediationRecommendation;
   index: number;
   decision: RecommendationDecision;
   onDecision: (decision: RecommendationDecision) => void;
+  saving: boolean;
 }) {
   const confidence = Math.round(recommendation.confidence * 100);
   const finding = recommendation.related_finding;
@@ -490,6 +533,7 @@ function RecommendationCard({
             <button
               aria-pressed={decision === option}
               className={`decision-button decision-button-${option}`}
+              disabled={saving}
               key={option}
               onClick={() => onDecision(option)}
               type="button"
@@ -507,6 +551,7 @@ function RecommendationCard({
 function ApprovedRemediationPlan({
   items,
   datasetId,
+  workflowStatus,
   validationBaseline,
 }: {
   items: Array<{
@@ -515,6 +560,7 @@ function ApprovedRemediationPlan({
     index: number;
   }>;
   datasetId?: string;
+  workflowStatus?: string;
   validationBaseline: ValidationBaseline;
 }) {
   return (
@@ -558,20 +604,15 @@ function ApprovedRemediationPlan({
         approvedRecommendations={items.map((item) => item.recommendation)}
         datasetId={datasetId}
         key={items.map((item) => item.id).join("|") || "no-approvals"}
+        persistedWorkflowStatus={workflowStatus}
         validationBaseline={validationBaseline}
       />
     </section>
   );
 }
 
-function getRecommendationId(
-  recommendation: RemediationRecommendation,
-  index: number,
-) {
-  const finding = recommendation.related_finding;
-  return [finding.type, finding.file, finding.affected_column ?? "file", index].join(
-    "-",
-  );
+function getRecommendationId(index: number) {
+  return `recommendation-${index}`;
 }
 
 function formatLabel(value: string) {

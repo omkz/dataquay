@@ -39,10 +39,12 @@ const idleState = { status: "idle" } as const;
 export function RemediationWorkflow({
   approvedRecommendations,
   datasetId,
+  persistedWorkflowStatus,
   validationBaseline,
 }: {
   approvedRecommendations: RemediationRecommendation[];
   datasetId?: string;
+  persistedWorkflowStatus?: string;
   validationBaseline: ValidationBaseline;
 }) {
   const [preview, setPreview] = useState<StepState<RemediationPreviewResponse>>(
@@ -61,14 +63,42 @@ export function RemediationWorkflow({
   const [isPending, startTransition] = useTransition();
 
   const hasApprovals = approvedRecommendations.length > 0;
-  const previewComplete = preview.status === "success";
-  const applyComplete = application.status === "success";
-  const validationComplete = validation.status === "success";
+  const restoredApplyComplete = workflowReached(
+    persistedWorkflowStatus,
+    "remediated",
+  );
+  const restoredValidationComplete = workflowReached(
+    persistedWorkflowStatus,
+    "validated",
+  );
+  const restoredPackageComplete = workflowReached(
+    persistedWorkflowStatus,
+    "package_ready",
+  );
+  const previewComplete = preview.status === "success" || restoredApplyComplete;
+  const applyComplete = application.status === "success" || restoredApplyComplete;
+  const validationComplete =
+    validation.status === "success" || restoredValidationComplete;
   const validationPassed =
-    validationComplete &&
-    validation.data.source_checksums_verified &&
-    validation.data.output_checksums_verified &&
-    validation.data.original_files_unchanged;
+    restoredValidationComplete ||
+    (validation.status === "success" &&
+      validation.data.source_checksums_verified &&
+      validation.data.output_checksums_verified &&
+      validation.data.original_files_unchanged);
+  const previewState =
+    preview.status === "idle" && restoredApplyComplete ? "success" : preview.status;
+  const applicationState =
+    application.status === "idle" && restoredApplyComplete
+      ? "success"
+      : application.status;
+  const validationState =
+    validation.status === "idle" && restoredValidationComplete
+      ? "success"
+      : validation.status;
+  const packageState =
+    packageResult.status === "idle" && restoredPackageComplete
+      ? "success"
+      : packageResult.status;
 
   function runPreview() {
     setApplication(idleState);
@@ -233,7 +263,7 @@ export function RemediationWorkflow({
           title="Preview remediation"
           description="Classify approved proposals as automatic or manual before creating a working copy."
           state={
-            isPending && activeStep === "preview" ? "active" : preview.status
+            isPending && activeStep === "preview" ? "active" : previewState
           }
           action={
             <WorkflowButton
@@ -253,6 +283,8 @@ export function RemediationWorkflow({
             <WorkflowError state={preview} />
           ) : preview.status === "success" ? (
             <PreviewResult preview={preview.data} />
+          ) : restoredApplyComplete ? (
+            <RestoredStage message="Remediation preview was completed in an earlier session." />
           ) : null}
         </WorkflowStepCard>
 
@@ -262,7 +294,7 @@ export function RemediationWorkflow({
           title="Apply safe actions"
           description="Create a fresh working copy and apply only deterministic actions marked safe."
           state={
-            isPending && activeStep === "apply" ? "active" : application.status
+            isPending && activeStep === "apply" ? "active" : applicationState
           }
           action={
             <WorkflowButton
@@ -280,6 +312,8 @@ export function RemediationWorkflow({
             <WorkflowError state={application} />
           ) : application.status === "success" ? (
             <ApplicationResult application={application.data} />
+          ) : restoredApplyComplete ? (
+            <RestoredStage message="A working copy was created in an earlier session. Run validation next." />
           ) : null}
         </WorkflowStepCard>
 
@@ -290,7 +324,7 @@ export function RemediationWorkflow({
           title="Validate working copy"
           description="Reinspect the output, compare findings, and verify source and output checksums."
           state={
-            isPending && activeStep === "validate" ? "active" : validation.status
+            isPending && activeStep === "validate" ? "active" : validationState
           }
           action={
             <WorkflowButton
@@ -311,13 +345,15 @@ export function RemediationWorkflow({
               baseline={validationBaseline}
               validation={validation.data}
             />
+          ) : restoredValidationComplete ? (
+            <RestoredStage message="Checksum validation passed in an earlier session. You can generate the package again." />
           ) : null}
         </WorkflowStepCard>
 
         <WorkflowStepCard
           expanded={
             activeStep === "package" ||
-            (validationComplete && packageResult.status !== "success")
+            (validationComplete && packageState !== "success")
           }
           number={4}
           sectionId="package"
@@ -326,13 +362,13 @@ export function RemediationWorkflow({
           state={
             isPending && activeStep === "package"
               ? "active"
-              : packageResult.status
+              : packageState
           }
           action={
             <WorkflowButton
               disabled={!validationPassed || isPending}
               label={
-                packageResult.status === "success"
+                packageState === "success"
                   ? "Generate package again"
                   : "Generate package"
               }
@@ -355,11 +391,54 @@ export function RemediationWorkflow({
               datasetId={datasetId}
               packageResult={packageResult.data}
             />
+          ) : restoredPackageComplete ? (
+            <RestoredPackage datasetId={datasetId} />
           ) : null}
         </WorkflowStepCard>
       </div>
     </section>
   );
+}
+
+function RestoredStage({ message }: { message: string }) {
+  return (
+    <div className="workflow-restored" role="status">
+      <strong>Restored from persisted workflow</strong>
+      <p>{message}</p>
+    </div>
+  );
+}
+
+function RestoredPackage({ datasetId }: { datasetId?: string }) {
+  if (!datasetId) return null;
+  return (
+    <div className="workflow-restored">
+      <strong>Package restored</strong>
+      <p>The previously generated package is still available in local storage.</p>
+      <a
+        className="package-download-link"
+        href={`/api/datasets/${encodeURIComponent(datasetId)}/package`}
+      >
+        Download existing ZIP
+      </a>
+    </div>
+  );
+}
+
+function workflowReached(current: string | undefined, target: string) {
+  const order = [
+    "uploaded",
+    "inspected",
+    "clarifying",
+    "recommendations_ready",
+    "in_review",
+    "remediated",
+    "validated",
+    "package_ready",
+    "completed",
+  ];
+  if (!current || current === "blocked") return false;
+  return order.indexOf(current) >= order.indexOf(target);
 }
 
 function WorkflowStepCard({

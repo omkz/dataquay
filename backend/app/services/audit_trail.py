@@ -6,6 +6,11 @@ import re
 from pydantic import ValidationError
 
 from app.schemas import AuditAction, AuditEvent, AuditStatus, DatasetAuditTrail
+from app.services.workflow_repository import (
+    PersistenceError,
+    persist_audit_event,
+    read_persisted_audit_trail,
+)
 
 AUDIT_DIRECTORY_NAME = "audit"
 AUDIT_FILE_NAME = "events.jsonl"
@@ -40,6 +45,10 @@ def append_audit_event(
         dataset_id=dataset_id,
         summary=_safe_summary(summary),
     )
+    try:
+        persist_audit_event(event)
+    except PersistenceError as exc:
+        raise AuditTrailError("The dataset audit event could not be persisted.") from exc
     payload = (event.model_dump_json() + "\n").encode("utf-8")
     audit_path = audit_directory / AUDIT_FILE_NAME
 
@@ -68,6 +77,12 @@ def read_audit_trail(
     *,
     dataset_id: str,
 ) -> DatasetAuditTrail:
+    try:
+        persisted = read_persisted_audit_trail(dataset_id)
+    except PersistenceError as exc:
+        raise AuditTrailError("The persisted audit trail is unavailable.") from exc
+    if persisted is not None:
+        return persisted
     audit_path = (
         Path(workspace_directory).resolve()
         / AUDIT_DIRECTORY_NAME

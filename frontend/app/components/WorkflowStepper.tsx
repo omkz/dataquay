@@ -261,6 +261,7 @@ function reconstructProgress(
   const clarificationResponse = latestEvent(events, "clarification_response");
   const clarification = laterEvent(clarificationReview, clarificationResponse);
   const recommendation = latestEvent(events, "recommendation_generation");
+  const decision = latestEvent(events, "human_decision");
   if (clarification) {
     progress.clarifications = eventSignal(
       clarification.event,
@@ -275,6 +276,14 @@ function reconstructProgress(
     progress.recommendations = eventSignal(
       recommendation.event,
       "Recommendations are ready. Review each proposal and record a decision.",
+    );
+  }
+  if (decision && (!recommendation || decision.index > recommendation.index)) {
+    progress.recommendations = { status: "complete" };
+    progress.review = eventSignal(
+      decision.event,
+      "Review decisions are saved. Approve at least one proposal to continue.",
+      "active",
     );
   }
 

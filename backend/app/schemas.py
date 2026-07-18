@@ -93,6 +93,7 @@ class AuditAction(StrEnum):
     RECOMMENDATION_GENERATION = "recommendation_generation"
     CLARIFICATION_REVIEW = "clarification_review"
     CLARIFICATION_RESPONSE = "clarification_response"
+    HUMAN_DECISION = "human_decision"
     REMEDIATION_PREVIEW = "remediation_preview"
     REMEDIATION_APPLY = "remediation_apply"
     VALIDATION = "validation"
@@ -136,6 +137,44 @@ class RemediationRecommendation(BaseModel):
 
 class RecommendationResponse(BaseModel):
     recommendations: list[RemediationRecommendation]
+
+
+class RecommendationDecision(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class RecommendationDecisionRequest(BaseModel):
+    recommendation_key: str = Field(min_length=1, max_length=180)
+    decision: RecommendationDecision
+
+
+class RecommendationDecisionResponse(BaseModel):
+    decisions: dict[str, RecommendationDecision]
+
+
+class WorkspaceSummary(BaseModel):
+    dataset_id: str
+    dataset_name: str
+    original_file_name: str
+    file_count: int
+    archive_size_bytes: int
+    workflow_status: str
+    current_stage: str
+    readiness_status: ReadinessStatus | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class WorkspaceListResponse(BaseModel):
+    workspaces: list[WorkspaceSummary]
+
+
+class WorkspaceDetail(WorkspaceSummary):
+    recommendations_generated: bool
+    recommendations: list[RemediationRecommendation]
+    decisions: dict[str, RecommendationDecision]
 
 
 class ClarificationStatus(StrEnum):

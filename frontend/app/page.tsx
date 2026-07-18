@@ -5,6 +5,8 @@ import { UploadLanding } from "@/app/components/UploadLanding";
 import {
   getSampleDatasetInspection,
   getUploadedDatasetInspection,
+  getWorkspaceDetail,
+  getWorkspaceList,
 } from "@/lib/dataquay";
 
 export default async function Home({
@@ -20,12 +22,16 @@ export default async function Home({
   const demo = query.demo === "sample";
 
   if (!datasetId && !demo) {
-    return <UploadLanding />;
+    const workspaceResult = await getWorkspaceList();
+    return <UploadLanding workspaceResult={workspaceResult} />;
   }
 
-  const result = datasetId
-    ? await getUploadedDatasetInspection(datasetId)
-    : await getSampleDatasetInspection();
+  const [result, workspaceResult] = datasetId
+    ? await Promise.all([
+        getUploadedDatasetInspection(datasetId),
+        getWorkspaceDetail(datasetId),
+      ])
+    : [await getSampleDatasetInspection(), null];
 
   if (!result.ok) {
     return (
@@ -37,11 +43,22 @@ export default async function Home({
     );
   }
 
+  if (datasetId && workspaceResult && !workspaceResult.ok) {
+    return (
+      <InspectionError
+        message={workspaceResult.message}
+        retryHref={`/?dataset=${encodeURIComponent(datasetId)}`}
+        target="persisted dataset workflow"
+      />
+    );
+  }
+
   return (
     <DatasetOverview
       datasetId={datasetId ?? undefined}
       inspection={result.data}
       mode={datasetId ? "uploaded" : "sample"}
+      workspace={workspaceResult?.ok ? workspaceResult.data : undefined}
     />
   );
 }

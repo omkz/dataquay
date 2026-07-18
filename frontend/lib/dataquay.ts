@@ -65,6 +65,7 @@ export type AuditAction =
   | "clarification_review"
   | "clarification_response"
   | "recommendation_generation"
+  | "human_decision"
   | "remediation_preview"
   | "remediation_apply"
   | "validation"
@@ -99,6 +100,39 @@ export type RemediationRecommendation = {
   human_approval_required: boolean;
   assumptions: string[];
 };
+
+export type RecommendationDecision = "pending" | "approved" | "rejected";
+
+export type WorkspaceSummary = {
+  dataset_id: string;
+  dataset_name: string;
+  original_file_name: string;
+  file_count: number;
+  archive_size_bytes: number;
+  workflow_status: string;
+  current_stage: string;
+  readiness_status: ReadinessStatus | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WorkspaceDetail = WorkspaceSummary & {
+  recommendations_generated: boolean;
+  recommendations: RemediationRecommendation[];
+  decisions: Record<string, RecommendationDecision>;
+};
+
+export type WorkspaceListResult =
+  | { ok: true; data: WorkspaceSummary[] }
+  | { ok: false; message: string };
+
+export type WorkspaceDetailResult =
+  | { ok: true; data: WorkspaceDetail }
+  | { ok: false; message: string };
+
+export type RecommendationDecisionResult =
+  | { ok: true; decisions: Record<string, RecommendationDecision> }
+  | { ok: false; message: string };
 
 export type ClarificationStatus = "unanswered" | "answered" | "deferred";
 
@@ -241,6 +275,70 @@ export async function getUploadedDatasetInspection(
   );
 }
 
+export async function getWorkspaceList(): Promise<WorkspaceListResult> {
+  try {
+    const response = await fetch(`${getBackendUrl()}/api/workspaces`, {
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
+    const payload: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
+      return {
+        ok: false,
+        message: extractApiDetail(
+          payload,
+          `Workspace history returned HTTP ${response.status}.`,
+        ),
+      };
+    }
+    if (!isRecord(payload) || !Array.isArray(payload.workspaces)) {
+      return { ok: false, message: "Workspace history returned an unexpected response." };
+    }
+    if (!payload.workspaces.every(isWorkspaceSummary)) {
+      return { ok: false, message: "Workspace history contains invalid records." };
+    }
+    return { ok: true, data: payload.workspaces };
+  } catch {
+    return {
+      ok: false,
+      message: "Workspace history is unavailable. Confirm that the backend and PostgreSQL are running.",
+    };
+  }
+}
+
+export async function getWorkspaceDetail(
+  datasetId: string,
+): Promise<WorkspaceDetailResult> {
+  if (!isDatasetIdentifier(datasetId)) {
+    return { ok: false, message: "The dataset identifier is invalid." };
+  }
+  try {
+    const response = await fetch(
+      `${getBackendUrl()}/api/workspaces/${encodeURIComponent(datasetId)}`,
+      { cache: "no-store", headers: { Accept: "application/json" } },
+    );
+    const payload: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
+      return {
+        ok: false,
+        message: extractApiDetail(
+          payload,
+          `Workspace metadata returned HTTP ${response.status}.`,
+        ),
+      };
+    }
+    if (!isWorkspaceDetail(payload)) {
+      return { ok: false, message: "Workspace metadata returned an unexpected response." };
+    }
+    return { ok: true, data: payload };
+  } catch {
+    return {
+      ok: false,
+      message: "Persisted workflow state is unavailable. Confirm that the backend and PostgreSQL are running.",
+    };
+  }
+}
+
 export function isDatasetUploadResponse(
   value: unknown,
 ): value is DatasetUploadResponse {
@@ -329,6 +427,7 @@ const auditActions = new Set<AuditAction>([
   "clarification_review",
   "clarification_response",
   "recommendation_generation",
+  "human_decision",
   "remediation_preview",
   "remediation_apply",
   "validation",
@@ -568,6 +667,52 @@ function isReadinessSummary(value: unknown): value is ReadinessSummary {
       isRecord(value.finding_counts_by_severity) &&
       isRecord(value.finding_counts_by_type),
   );
+}
+
+function isWorkspaceSummary(value: unknown): value is WorkspaceSummary {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.dataset_id === "string" &&
+    isDatasetIdentifier(value.dataset_id) &&
+    typeof value.dataset_name === "string" &&
+    typeof value.original_file_name === "string" &&
+    typeof value.file_count === "number" &&
+    typeof value.archive_size_bytes === "number" &&
+    typeof value.workflow_status === "string" &&
+    typeof value.current_stage === "string" &&
+    (value.readiness_status === null ||
+      value.readiness_status === "not_ready" ||
+      value.readiness_status === "needs_review" ||
+      value.readiness_status === "ready") &&
+    typeof value.created_at === "string" &&
+    typeof value.updated_at === "string"
+  );
+}
+
+function isWorkspaceDetail(value: unknown): value is WorkspaceDetail {
+  if (!isWorkspaceSummary(value) || !isRecord(value)) return false;
+  const candidate = value as WorkspaceSummary & Record<string, unknown>;
+  return (
+    typeof candidate.recommendations_generated === "boolean" &&
+    Array.isArray(candidate.recommendations) &&
+    candidate.recommendations.every(isRemediationRecommendation) &&
+    isRecord(candidate.decisions) &&
+    Object.values(candidate.decisions).every(
+      (decision) =>
+        decision === "pending" || decision === "approved" || decision === "rejected",
+    )
+  );
+}
+
+function extractApiDetail(payload: unknown, fallback: string) {
+  if (
+    isRecord(payload) &&
+    typeof payload.detail === "string" &&
+    payload.detail.length > 0
+  ) {
+    return payload.detail;
+  }
+  return fallback;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -2,8 +2,13 @@ import Link from "next/link";
 
 import { DatasetUploadForm } from "@/app/components/DatasetUploadForm";
 import { WorkflowStepper } from "@/app/components/WorkflowStepper";
+import type { WorkspaceListResult, WorkspaceSummary } from "@/lib/dataquay";
 
-export function UploadLanding() {
+export function UploadLanding({
+  workspaceResult,
+}: {
+  workspaceResult: WorkspaceListResult;
+}) {
   return (
     <div className="app-shell upload-shell">
       <header className="site-header">
@@ -48,9 +53,11 @@ export function UploadLanding() {
             Unsafe paths, executable content, and oversized files are rejected.
           </SafetyItem>
           <SafetyItem mark="LOCAL" title="Stored locally">
-            This iteration uses an isolated local workspace without a database.
+            Dataset files stay local; PostgreSQL stores workflow metadata only.
           </SafetyItem>
         </section>
+
+        <WorkspaceHistory result={workspaceResult} />
 
         <section className="demo-option">
           <div>
@@ -70,6 +77,81 @@ export function UploadLanding() {
       </footer>
     </div>
   );
+}
+
+function WorkspaceHistory({ result }: { result: WorkspaceListResult }) {
+  return (
+    <section className="workspace-history" aria-labelledby="workspace-history-title">
+      <div className="workspace-history-heading">
+        <div>
+          <p className="section-kicker">Saved workspaces</p>
+          <h2 id="workspace-history-title">Continue an unfinished workflow</h2>
+          <p>Workflow metadata and review decisions survive application restarts.</p>
+        </div>
+        {result.ok ? <span>{result.data.length} saved</span> : null}
+      </div>
+
+      {!result.ok ? (
+        <div className="workspace-history-error" role="status">
+          <strong>Saved workspaces are unavailable.</strong>
+          <p>{result.message}</p>
+        </div>
+      ) : result.data.length === 0 ? (
+        <div className="workspace-history-empty">
+          No uploaded workspaces yet. Upload a ZIP archive to create the first one.
+        </div>
+      ) : (
+        <div className="workspace-list">
+          {result.data.map((workspace) => (
+            <WorkspaceCard key={workspace.dataset_id} workspace={workspace} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function WorkspaceCard({ workspace }: { workspace: WorkspaceSummary }) {
+  return (
+    <Link
+      className="workspace-card"
+      href={`/?dataset=${encodeURIComponent(workspace.dataset_id)}`}
+    >
+      <div>
+        <span className="workspace-status">{formatLabel(workspace.workflow_status)}</span>
+        <h3>{formatLabel(workspace.dataset_name)}</h3>
+        <p>{workspace.original_file_name}</p>
+      </div>
+      <dl>
+        <div>
+          <dt>Next stage</dt>
+          <dd>{formatLabel(workspace.current_stage)}</dd>
+        </div>
+        <div>
+          <dt>Files</dt>
+          <dd>{workspace.file_count}</dd>
+        </div>
+        <div>
+          <dt>Updated</dt>
+          <dd>{formatTimestamp(workspace.updated_at)}</dd>
+        </div>
+      </dl>
+      <span className="workspace-open">Reopen workflow →</span>
+    </Link>
+  );
+}
+
+function formatTimestamp(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
+}
+
+function formatLabel(value: string) {
+  return value
+    .replaceAll("_", " ")
+    .replaceAll("-", " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
 function SafetyItem({

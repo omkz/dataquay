@@ -11,7 +11,10 @@ from app.schemas import (
     RecommendationResponse,
 )
 from app.services.audit_trail import append_audit_event
-from app.services.clarifications import get_dataset_clarifications
+from app.services.clarifications import (
+    get_dataset_clarifications,
+    store_dataset_clarifications,
+)
 from app.services.csv_profiler import profile_csv
 from app.services.dataset_inspector import inspect_dataset
 from app.services.dataset_workspace import (
@@ -19,6 +22,12 @@ from app.services.dataset_workspace import (
     inspect_dataset_workspace,
 )
 from app.services.dataset_workflow import resolve_dataset_workflow_workspace
+from app.services.workflow_repository import (
+    PersistenceError,
+    save_recommendation_batch,
+    sync_clarifications,
+    update_workspace_readiness,
+)
 
 router = APIRouter(prefix="/api/inspect", tags=["inspection"])
 
@@ -65,6 +74,10 @@ def inspect_uploaded_dataset(dataset_id: str) -> DatasetInspection:
             f"{inspection.readiness.total_finding_count} deterministic findings."
         ),
     )
+    try:
+        update_workspace_readiness(dataset_id, inspection.readiness)
+    except PersistenceError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     return inspection
 
 
@@ -93,15 +106,18 @@ async def recommend_uploaded_dataset_remediation(
     except DatasetNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     try:
-        clarifications = get_dataset_clarifications(
+        generated_clarifications = get_dataset_clarifications(
             workflow.workspace_directory,
             dataset_id=dataset_id,
             findings=inspection.findings,
         )
+        clarifications = sync_clarifications(generated_clarifications)
+        store_dataset_clarifications(workflow.workspace_directory, clarifications)
         recommendations = await generate_recommendations(
             inspection,
             clarifications=clarifications,
         )
+        save_recommendation_batch(dataset_id, recommendations)
     except AIConfigurationError as exc:
         append_audit_event(
             workflow.workspace_directory,
@@ -113,6 +129,8 @@ async def recommend_uploaded_dataset_remediation(
                 "configuration was unavailable."
             ),
         )
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except PersistenceError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception:
         append_audit_event(

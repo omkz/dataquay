@@ -45,3 +45,17 @@ uv run uvicorn app.main:app --reload --env-file .env.local
 
 Local `.env` files are ignored by Git. Never put real provider API keys in the
 committed `.env.example` files.
+
+PostgreSQL stores workspace and workflow metadata while archives, extracted
+originals, working copies, and packages remain in local storage. After setting
+`DATAQUAY_DATABASE_URL` in `backend/.env.local`, apply migrations before starting
+the API:
+
+```bash
+cd backend
+uv sync
+uv run alembic upgrade head
+```
+
+To verify a rollback during development, run `uv run alembic downgrade base` and
+then reapply `uv run alembic upgrade head`.

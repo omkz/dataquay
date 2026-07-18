@@ -18,6 +18,11 @@ from app.schemas import (
 from app.services.audit_trail import append_audit_event
 from app.services.dataset_inspector import inspect_dataset
 from app.services.remediation_apply import calculate_file_checksum
+from app.services.workflow_repository import (
+    PersistenceError,
+    create_workspace_record,
+    delete_workspace_record,
+)
 
 DATAQUAY_DATA_ROOT_ENV = "DATAQUAY_DATA_ROOT"
 MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024
@@ -115,21 +120,30 @@ async def create_dataset_workspace(
             + "\n",
             encoding="utf-8",
         )
-        append_audit_event(
-            staging_root,
-            dataset_id=dataset_id,
-            action=AuditAction.UPLOAD,
-            status=AuditStatus.SUCCESS,
-            summary=(
-                f"Dataset archive accepted with {extracted_file_count} extracted "
-                f"files totaling {extracted_size} bytes."
-            ),
-        )
         archive_path.chmod(0o444)
         for extracted_file in original_directory.rglob("*"):
             if extracted_file.is_file():
                 extracted_file.chmod(0o444)
         staging_root.replace(final_root)
+        try:
+            create_workspace_record(response, storage_path=str(final_root))
+            append_audit_event(
+                final_root,
+                dataset_id=dataset_id,
+                action=AuditAction.UPLOAD,
+                status=AuditStatus.SUCCESS,
+                summary=(
+                    f"Dataset archive accepted with {extracted_file_count} extracted "
+                    f"files totaling {extracted_size} bytes."
+                ),
+            )
+        except Exception:
+            try:
+                delete_workspace_record(dataset_id)
+            except PersistenceError:
+                pass
+            shutil.rmtree(final_root, ignore_errors=True)
+            raise
         return response
     except Exception:
         shutil.rmtree(staging_root, ignore_errors=True)
