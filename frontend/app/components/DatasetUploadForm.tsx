@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { isDatasetUploadResponse } from "@/lib/dataquay";
+import { reportWorkflowProgress } from "@/app/components/WorkflowStepper";
 
 const MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024;
 
@@ -28,16 +29,29 @@ export function DatasetUploadForm() {
     if (!selectedFile) {
       setFile(null);
       setState({ status: "idle" });
+      reportWorkflowProgress(
+        undefined,
+        "upload",
+        "active",
+        "Select a ZIP archive containing the research dataset.",
+      );
       return;
     }
     const validationError = validateFile(selectedFile);
     if (validationError) {
       setFile(null);
       setState({ status: "error", message: validationError });
+      reportWorkflowProgress(undefined, "upload", "blocked", validationError);
       return;
     }
     setFile(selectedFile);
     setState({ status: "idle" });
+    reportWorkflowProgress(
+      undefined,
+      "upload",
+      "active",
+      "ZIP selected. Choose Upload and inspect to create the isolated workspace.",
+    );
   }
 
   function uploadDataset() {
@@ -45,6 +59,12 @@ export function DatasetUploadForm() {
     const request = new XMLHttpRequest();
     requestRef.current = request;
     setState({ status: "uploading", progress: 0 });
+    reportWorkflowProgress(
+      undefined,
+      "upload",
+      "active",
+      "Uploading and validating the dataset archive.",
+    );
     request.open("POST", "/api/datasets/upload");
     request.upload.addEventListener("progress", (event) => {
       if (event.lengthComputable) {
@@ -59,24 +79,40 @@ export function DatasetUploadForm() {
       const payload = parseJson(request.responseText);
       if (request.status === 201 && isDatasetUploadResponse(payload)) {
         setState({ status: "inspecting" });
+        reportWorkflowProgress(
+          undefined,
+          "upload",
+          "complete",
+          "Upload complete. The original archive and extracted files are preserved.",
+        );
+        reportWorkflowProgress(
+          undefined,
+          "inspection",
+          "active",
+          "Opening the isolated workspace and loading inspection results.",
+        );
         router.push(`/?dataset=${encodeURIComponent(payload.dataset_id)}`);
         return;
       }
+      const message = getUploadError(
+        payload,
+        `The upload service returned HTTP ${request.status}.`,
+      );
       setState({
         status: "error",
-        message: getUploadError(
-          payload,
-          `The upload service returned HTTP ${request.status}.`,
-        ),
+        message,
       });
+      reportWorkflowProgress(undefined, "upload", "blocked", message);
     });
     request.addEventListener("error", () => {
       requestRef.current = null;
+      const message =
+        "The upload could not be completed. Check the backend connection and try again.";
       setState({
         status: "error",
-        message:
-          "The upload could not be completed. Check the backend connection and try again.",
+        message,
       });
+      reportWorkflowProgress(undefined, "upload", "blocked", message);
     });
     request.addEventListener("abort", () => {
       requestRef.current = null;

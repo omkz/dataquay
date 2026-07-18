@@ -5,6 +5,7 @@ import { useActionState, useEffect, useState } from "react";
 import { generateRecommendations } from "@/app/actions/recommendations";
 import { notifyDatasetAuditUpdated } from "@/app/components/AuditTimeline";
 import { RemediationWorkflow } from "@/app/components/RemediationWorkflow";
+import { reportWorkflowProgress } from "@/app/components/WorkflowStepper";
 import type {
   RecommendationActionState,
   RemediationRecommendation,
@@ -25,10 +26,45 @@ export function RecommendationsPanel({ datasetId }: { datasetId?: string }) {
   );
 
   useEffect(() => {
-    if (!pending && state.status !== "idle") {
+    if (pending) {
+      reportWorkflowProgress(
+        datasetId,
+        "recommendations",
+        "active",
+        "The Data Steward Agent is generating masked, proposal-only guidance.",
+      );
+      return;
+    }
+    if (state.status !== "idle") {
       notifyDatasetAuditUpdated(datasetId);
     }
-  }, [datasetId, pending, state.status, state.generation]);
+    if (state.status === "success") {
+      reportWorkflowProgress(
+        datasetId,
+        "recommendations",
+        "complete",
+        "Recommendations are ready. Review each proposal and record a decision.",
+      );
+      if (state.recommendations.length === 0) {
+        reportWorkflowProgress(
+          datasetId,
+          "review",
+          "blocked",
+          "No recommendations were returned. Generate again or review the deterministic findings manually.",
+        );
+      }
+    } else if (
+      state.status === "configuration_error" ||
+      state.status === "error"
+    ) {
+      reportWorkflowProgress(
+        datasetId,
+        "recommendations",
+        "blocked",
+        state.message ?? "Recommendation generation must succeed before review.",
+      );
+    }
+  }, [datasetId, pending, state]);
 
   return (
     <section className="content-section" aria-labelledby="recommendations-title">
@@ -124,6 +160,31 @@ function RecommendationReview({
   const approvedRecommendations = reviewedRecommendations.filter(
     (item) => item.decision === "approved",
   );
+
+  useEffect(() => {
+    if (decisionCounts.approved > 0) {
+      reportWorkflowProgress(
+        datasetId,
+        "review",
+        "complete",
+        `${decisionCounts.approved} approved recommendation${decisionCounts.approved === 1 ? " is" : "s are"} ready for remediation preview.`,
+      );
+    } else if (decisionCounts.pending > 0) {
+      reportWorkflowProgress(
+        datasetId,
+        "review",
+        "active",
+        `Review ${decisionCounts.pending} pending recommendation${decisionCounts.pending === 1 ? "" : "s"} and approve at least one to continue.`,
+      );
+    } else {
+      reportWorkflowProgress(
+        datasetId,
+        "review",
+        "blocked",
+        "All recommendations are rejected. Approve one or generate a new set to continue.",
+      );
+    }
+  }, [datasetId, decisionCounts.approved, decisionCounts.pending]);
 
   function updateDecision(id: string, decision: RecommendationDecision) {
     setDecisions((current) => ({ ...current, [id]: decision }));

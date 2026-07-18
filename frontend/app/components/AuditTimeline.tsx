@@ -8,7 +8,7 @@ import {
   type DatasetAuditTrail,
 } from "@/lib/dataquay";
 
-const AUDIT_UPDATED_EVENT = "dataquay:audit-updated";
+export const DATASET_AUDIT_UPDATED_EVENT = "dataquay:audit-updated";
 
 type TimelineState =
   | { status: "loading" }
@@ -65,10 +65,10 @@ export function AuditTimeline({ datasetId }: { datasetId: string }) {
         void loadAudit(true);
       }
     }
-    window.addEventListener(AUDIT_UPDATED_EVENT, handleAuditUpdate);
+    window.addEventListener(DATASET_AUDIT_UPDATED_EVENT, handleAuditUpdate);
     return () => {
       window.clearTimeout(initialLoad);
-      window.removeEventListener(AUDIT_UPDATED_EVENT, handleAuditUpdate);
+      window.removeEventListener(DATASET_AUDIT_UPDATED_EVENT, handleAuditUpdate);
     };
   }, [datasetId, loadAudit]);
 
@@ -138,7 +138,7 @@ export function AuditTimeline({ datasetId }: { datasetId: string }) {
 export function notifyDatasetAuditUpdated(datasetId?: string) {
   if (!datasetId) return;
   window.dispatchEvent(
-    new CustomEvent(AUDIT_UPDATED_EVENT, { detail: { datasetId } }),
+    new CustomEvent(DATASET_AUDIT_UPDATED_EVENT, { detail: { datasetId } }),
   );
 }
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { DatasetUploadForm } from "@/app/components/DatasetUploadForm";
+import { WorkflowStepper } from "@/app/components/WorkflowStepper";
 
 export function UploadLanding() {
   return (
@@ -17,6 +18,7 @@ export function UploadLanding() {
       </header>
 
       <main className="upload-main">
+        <WorkflowStepper stage="upload" />
         <section className="upload-hero" aria-labelledby="upload-title">
           <div className="upload-hero-copy">
             <p className="eyebrow">New dataset</p>

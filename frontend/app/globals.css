@@ -496,6 +496,197 @@ a {
   font-size: 13px;
 }
 
+.workflow-progress {
+  margin-bottom: 22px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgb(255 255 255 / 76%);
+  box-shadow: 0 14px 38px rgb(23 33 29 / 7%);
+}
+
+.workflow-progress-upload {
+  margin-bottom: 46px;
+}
+
+.workflow-progress-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.workflow-progress-heading h2 {
+  margin: 0;
+  font-size: 21px;
+  letter-spacing: -0.035em;
+}
+
+.workflow-progress-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.workflow-progress-actions > span {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.start-over-link {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid #b9cbc2;
+  border-radius: 9px;
+  background: white;
+  color: var(--brand-dark);
+  font-size: 10px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.start-over-link:hover {
+  border-color: var(--brand);
+  background: #f1f8f5;
+}
+
+.workflow-progress-list {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(104px, 1fr));
+  margin: 24px 0 0;
+  padding: 0;
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+
+.workflow-progress-list li {
+  position: relative;
+  display: grid;
+  min-width: 104px;
+  justify-items: center;
+  gap: 5px;
+  padding-inline: 5px;
+  text-align: center;
+}
+
+.workflow-progress-list li:not(:last-child)::after {
+  position: absolute;
+  z-index: 0;
+  top: 15px;
+  left: calc(50% + 17px);
+  width: calc(100% - 34px);
+  height: 2px;
+  background: #dce4e0;
+  content: "";
+}
+
+.workflow-progress-list li.progress-complete:not(:last-child)::after {
+  background: #85bda8;
+}
+
+.progress-number {
+  z-index: 1;
+  display: grid;
+  width: 31px;
+  height: 31px;
+  place-items: center;
+  border: 2px solid #d4dfda;
+  border-radius: 999px;
+  background: white;
+  color: #77837d;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.progress-complete .progress-number {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: white;
+}
+
+.progress-active .progress-number {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  box-shadow: 0 0 0 4px rgb(12 102 80 / 8%);
+}
+
+.progress-blocked .progress-number {
+  border-color: #d58d7f;
+  background: #fff1ee;
+  color: var(--high);
+}
+
+.progress-label {
+  color: #39443f;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.progress-status {
+  color: #85908a;
+  font-size: 7px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.progress-complete .progress-status {
+  color: var(--brand);
+}
+
+.progress-active .progress-status {
+  color: var(--medium);
+}
+
+.progress-blocked .progress-status {
+  color: var(--high);
+}
+
+.workflow-next-action {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 13px;
+  margin-top: 22px;
+  padding: 12px 14px;
+  border: 1px solid #c8ddd4;
+  border-radius: 10px;
+  background: #f0f8f4;
+}
+
+.workflow-next-action > span {
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: var(--brand);
+  color: white;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.workflow-next-action strong {
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.workflow-next-action.is-blocked {
+  border-color: #e4b8b0;
+  background: #fff4f2;
+  color: #77443b;
+}
+
+.workflow-next-action.is-blocked > span {
+  background: var(--high);
+}
+
 .readiness-panel {
   display: flex;
   align-items: stretch;
@@ -1578,6 +1769,11 @@ tbody tr:last-child td {
   border-color: #e2b8b0;
 }
 
+.workflow-step-active {
+  border-color: #88b9a8;
+  box-shadow: 0 0 0 3px rgb(12 102 80 / 6%);
+}
+
 .workflow-step-header {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto;
@@ -1607,6 +1803,11 @@ tbody tr:last-child td {
 .workflow-step-error .workflow-step-number {
   background: #f8e5e1;
   color: var(--high);
+}
+
+.workflow-step-active .workflow-step-number {
+  background: var(--brand-soft);
+  color: var(--brand-dark);
 }
 
 .workflow-step-header h4 {
@@ -1643,6 +1844,11 @@ tbody tr:last-child td {
   color: var(--high);
 }
 
+.workflow-step-status.status-active {
+  background: #fff3d9;
+  color: #855a15;
+}
+
 .workflow-step-action {
   display: flex;
   align-items: center;
@@ -1651,10 +1857,22 @@ tbody tr:last-child td {
   padding: 0 18px 17px 64px;
 }
 
-.workflow-step-action p {
-  margin: 0;
-  color: #8a6a2f;
+.workflow-prerequisite {
+  display: grid;
+  gap: 3px;
+}
+
+.workflow-prerequisite strong {
+  color: #866124;
+  font-size: 8px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.workflow-prerequisite span {
+  color: #776543;
   font-size: 9px;
+  line-height: 1.45;
 }
 
 .workflow-button,
@@ -2372,6 +2590,24 @@ tbody tr:last-child td {
     min-width: 0;
   }
 
+  .workflow-progress {
+    padding: 20px;
+  }
+
+  .workflow-progress-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workflow-progress-actions {
+    justify-content: space-between;
+  }
+
+  .workflow-progress-list {
+    margin-right: -20px;
+    padding-right: 20px;
+  }
+
   .readiness-metrics {
     min-width: 0;
   }
@@ -2463,6 +2699,23 @@ tbody tr:last-child td {
 
   .header-actions {
     gap: 8px;
+  }
+
+  .workflow-progress-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .start-over-link {
+    width: 100%;
+  }
+
+  .workflow-next-action {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-next-action > span {
+    width: fit-content;
   }
 
   .upload-card {

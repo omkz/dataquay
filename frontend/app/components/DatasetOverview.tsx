@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { AuditTimeline } from "@/app/components/AuditTimeline";
 import { RecommendationsPanel } from "@/app/components/RecommendationsPanel";
+import { WorkflowStepper } from "@/app/components/WorkflowStepper";
 import type {
   DatasetInspection,
   InspectionFinding,
@@ -46,7 +47,7 @@ export function DatasetOverview({
           </span>
         </Link>
         <div className="header-actions">
-          <Link className="header-link" href="/">Upload another</Link>
+          <Link className="header-link" href="/">Start over</Link>
           <span className="environment-pill">
             {mode === "sample" ? "Sample demo" : "Uploaded dataset"}
           </span>
@@ -68,6 +69,8 @@ export function DatasetOverview({
             <code>{datasetId ?? summary.dataset_name}</code>
           </div>
         </section>
+
+        <WorkflowStepper datasetId={datasetId} />
 
         <section className="readiness-panel" aria-labelledby="readiness-title">
           <div className="readiness-copy">

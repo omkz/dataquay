@@ -9,6 +9,7 @@ import {
   validateAppliedRemediation,
 } from "@/app/actions/remediation-workflow";
 import { notifyDatasetAuditUpdated } from "@/app/components/AuditTimeline";
+import { reportWorkflowProgress } from "@/app/components/WorkflowStepper";
 import type {
   DatasetValidationResult,
   InspectionFinding,
@@ -65,10 +66,24 @@ export function RemediationWorkflow({
     setValidation(idleState);
     setPackageResult(idleState);
     setActiveStep("preview");
+    reportWorkflowProgress(
+      datasetId,
+      "remediation",
+      "active",
+      "Classifying approved proposals as automatic or manual actions.",
+    );
     startTransition(async () => {
       const result = await previewApprovedRemediation(
         approvedRecommendations,
         datasetId,
+      );
+      reportWorkflowProgress(
+        datasetId,
+        "remediation",
+        result.ok ? "active" : "blocked",
+        result.ok
+          ? "Preview complete. Apply the approved safe actions to create the working copy."
+          : result.message,
       );
       setPreview(
         result.ok
@@ -88,10 +103,24 @@ export function RemediationWorkflow({
     setValidation(idleState);
     setPackageResult(idleState);
     setActiveStep("apply");
+    reportWorkflowProgress(
+      datasetId,
+      "remediation",
+      "active",
+      "Creating a fresh working copy and applying safe deterministic actions.",
+    );
     startTransition(async () => {
       const result = await applyApprovedRemediation(
         approvedRecommendations,
         datasetId,
+      );
+      reportWorkflowProgress(
+        datasetId,
+        "remediation",
+        result.ok ? "complete" : "blocked",
+        result.ok
+          ? "Safe actions were applied to the working copy. Run validation next."
+          : result.message,
       );
       setApplication(
         result.ok
@@ -110,6 +139,12 @@ export function RemediationWorkflow({
   function runValidation() {
     setPackageResult(idleState);
     setActiveStep("validate");
+    reportWorkflowProgress(
+      datasetId,
+      "validation",
+      "active",
+      "Reinspecting the working copy and verifying source and output checksums.",
+    );
     startTransition(async () => {
       const result = await validateAppliedRemediation(datasetId);
       setValidation(
@@ -121,6 +156,14 @@ export function RemediationWorkflow({
               prerequisite: result.prerequisite,
             },
       );
+      reportWorkflowProgress(
+        datasetId,
+        "validation",
+        result.ok ? "complete" : "blocked",
+        result.ok
+          ? "Validation completed. Generate the final package next."
+          : result.message,
+      );
       notifyDatasetAuditUpdated(datasetId);
       setActiveStep(null);
     });
@@ -128,6 +171,12 @@ export function RemediationWorkflow({
 
   function runPackageGeneration() {
     setActiveStep("package");
+    reportWorkflowProgress(
+      datasetId,
+      "package",
+      "active",
+      "Generating documentation, metadata, manifests, checksums, and the final ZIP.",
+    );
     startTransition(async () => {
       const result = await generateFinalPackage(datasetId);
       setPackageResult(
@@ -138,6 +187,14 @@ export function RemediationWorkflow({
               message: result.message,
               prerequisite: result.prerequisite,
             },
+      );
+      reportWorkflowProgress(
+        datasetId,
+        "package",
+        result.ok ? "active" : "blocked",
+        result.ok
+          ? "The final package is ready. Download the ZIP to finish."
+          : result.message,
       );
       notifyDatasetAuditUpdated(datasetId);
       setActiveStep(null);
@@ -165,7 +222,9 @@ export function RemediationWorkflow({
           number={1}
           title="Preview remediation"
           description="Classify approved proposals as automatic or manual before creating a working copy."
-          state={preview.status}
+          state={
+            isPending && activeStep === "preview" ? "active" : preview.status
+          }
           action={
             <WorkflowButton
               disabled={!hasApprovals || isPending}
@@ -191,7 +250,9 @@ export function RemediationWorkflow({
           number={2}
           title="Apply safe actions"
           description="Create a fresh working copy and apply only deterministic actions marked safe."
-          state={application.status}
+          state={
+            isPending && activeStep === "apply" ? "active" : application.status
+          }
           action={
             <WorkflowButton
               disabled={!previewComplete || isPending}
@@ -215,7 +276,9 @@ export function RemediationWorkflow({
           number={3}
           title="Validate working copy"
           description="Reinspect the output, compare findings, and verify source and output checksums."
-          state={validation.status}
+          state={
+            isPending && activeStep === "validate" ? "active" : validation.status
+          }
           action={
             <WorkflowButton
               disabled={!applyComplete || isPending}
@@ -239,7 +302,11 @@ export function RemediationWorkflow({
           number={4}
           title="Generate final package"
           description="Build documentation, metadata, manifests, checksums, validation report, provenance, and ZIP."
-          state={packageResult.status}
+          state={
+            isPending && activeStep === "package"
+              ? "active"
+              : packageResult.status
+          }
           action={
             <WorkflowButton
               disabled={!validationPassed || isPending}
@@ -286,7 +353,7 @@ function WorkflowStepCard({
   number: number;
   title: string;
   description: string;
-  state: "idle" | "success" | "error";
+  state: "idle" | "active" | "success" | "error";
   action: React.ReactNode;
   prerequisite?: string;
   children: React.ReactNode;
@@ -300,11 +367,24 @@ function WorkflowStepCard({
           <p>{description}</p>
         </div>
         <span className={`workflow-step-status status-${state}`}>
-          {state === "success" ? "Complete" : state === "error" ? "Attention" : "Waiting"}
+          {state === "success"
+            ? "Complete"
+            : state === "error"
+              ? "Blocked"
+              : state === "active"
+                ? "Processing"
+                : "Waiting"}
         </span>
       </div>
       <div className="workflow-step-action">
-        {prerequisite ? <p>{prerequisite}</p> : <span />}
+        {prerequisite ? (
+          <div className="workflow-prerequisite">
+            <strong>Before you continue</strong>
+            <span>{prerequisite}</span>
+          </div>
+        ) : (
+          <span />
+        )}
         {action}
       </div>
       {children ? <div className="workflow-step-result">{children}</div> : null}
@@ -592,6 +672,12 @@ function PackageResult({
 
   async function downloadPackage() {
     setDownloadState({ status: "pending" });
+    reportWorkflowProgress(
+      datasetId,
+      "package",
+      "active",
+      "Preparing the validated package ZIP for download.",
+    );
     try {
       const downloadPath = datasetId
         ? `/api/datasets/${encodeURIComponent(datasetId)}/package`
@@ -608,6 +694,7 @@ function PackageResult({
             ? payload.detail
             : `The package download returned HTTP ${response.status}.`;
         setDownloadState({ status: "error", message: detail });
+        reportWorkflowProgress(datasetId, "package", "blocked", detail);
         return;
       }
 
@@ -618,12 +705,20 @@ function PackageResult({
       link.click();
       URL.revokeObjectURL(objectUrl);
       setDownloadState({ status: "idle" });
+      reportWorkflowProgress(
+        datasetId,
+        "package",
+        "complete",
+        "Package download started. The end-to-end workflow is complete.",
+      );
     } catch {
+      const message =
+        "The ZIP could not be downloaded. Confirm that the backend is running and try again.";
       setDownloadState({
         status: "error",
-        message:
-          "The ZIP could not be downloaded. Confirm that the backend is running and try again.",
+        message,
       });
+      reportWorkflowProgress(datasetId, "package", "blocked", message);
     }
   }
 
