@@ -162,10 +162,26 @@ export type ClarificationActionResult =
   | { ok: false; message: string };
 
 export type RecommendationActionState = {
-  status: "idle" | "success" | "configuration_error" | "error";
+  status:
+    | "idle"
+    | "success"
+    | "configuration_error"
+    | "database_error"
+    | "error";
   recommendations: RemediationRecommendation[];
   generation: number;
   message?: string;
+};
+
+export type BackendErrorCode =
+  | "database_not_configured"
+  | "database_unavailable"
+  | "ai_not_configured"
+  | "ai_service_unavailable";
+
+export type BackendApiError = {
+  code: BackendErrorCode | null;
+  message: string;
 };
 
 export type RemediationAction = {
@@ -407,6 +423,24 @@ export function isDatasetIdentifier(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
     value,
   );
+}
+
+export function getBackendApiError(value: unknown): BackendApiError | null {
+  if (!isRecord(value) || typeof value.detail !== "string") return null;
+  const knownCodes = new Set<BackendErrorCode>([
+    "database_not_configured",
+    "database_unavailable",
+    "ai_not_configured",
+    "ai_service_unavailable",
+  ]);
+  return {
+    code:
+      typeof value.code === "string" &&
+      knownCodes.has(value.code as BackendErrorCode)
+        ? (value.code as BackendErrorCode)
+        : null,
+    message: value.detail,
+  };
 }
 
 function isAuditEvent(value: unknown): value is AuditEvent {

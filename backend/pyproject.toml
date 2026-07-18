@@ -22,3 +22,6 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+markers = [
+    "postgresql: integration tests that require an isolated PostgreSQL schema",
+]

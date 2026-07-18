@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from app.schemas import DatasetAuditTrail
-from app.services.audit_trail import AuditTrailError, read_audit_trail
+from app.services.audit_trail import read_audit_trail
 from app.services.dataset_workspace import DatasetNotFoundError
 from app.services.dataset_workflow import resolve_dataset_workflow_workspace
 
@@ -21,5 +21,3 @@ def get_dataset_audit_trail(dataset_id: str) -> DatasetAuditTrail:
         )
     except DatasetNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except AuditTrailError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc

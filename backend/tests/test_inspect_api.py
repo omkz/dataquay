@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 from app.main import app
+from app.api_errors import AIServiceError
 from app.schemas import RecommendationResponse
 
 
@@ -266,8 +267,29 @@ def test_recommendations_endpoint_reports_missing_ai_configuration(
 
     assert response.status_code == 503
     assert response.json() == {
+        "code": "ai_not_configured",
         "detail": (
             "DATAQUAY_AI_MODEL is not configured; set it to a "
             "PydanticAI provider-qualified model name."
         )
+    }
+
+
+def test_recommendations_endpoint_reports_ai_provider_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fail_generation(_inspection):
+        raise AIServiceError("The configured AI provider is temporarily unavailable.")
+
+    monkeypatch.setattr(
+        "app.routes.inspect.generate_recommendations",
+        fail_generation,
+    )
+
+    response = client.post("/api/inspect/sample-dataset/recommendations")
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "code": "ai_service_unavailable",
+        "detail": "The configured AI provider is temporarily unavailable.",
     }

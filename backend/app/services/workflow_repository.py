@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.api_errors import DatabaseUnavailableError
 from app.database import session_scope
 from app.models import (
     AuditEventRecord,
@@ -35,7 +36,7 @@ from app.schemas import (
 )
 
 
-class PersistenceError(RuntimeError):
+class PersistenceError(DatabaseUnavailableError):
     """Raised when PostgreSQL workflow metadata cannot be read or stored."""
 
 
@@ -263,6 +264,13 @@ def save_recommendation_batch(
     workspace_id = _required_workspace_id(dataset_id)
     try:
         with session_scope() as session:
+            workspace = session.scalar(
+                select(Workspace)
+                .where(Workspace.id == workspace_id)
+                .with_for_update()
+            )
+            if workspace is None:
+                raise LookupError("Dataset workspace metadata was not found.")
             generation = session.scalar(
                 select(func.coalesce(func.max(RecommendationBatch.generation), 0)).where(
                     RecommendationBatch.workspace_id == workspace_id
@@ -303,11 +311,11 @@ def save_recommendation_batch(
                         decision=RecommendationDecision.PENDING.value,
                     )
                 )
-            workspace = session.get(Workspace, workspace_id)
-            if workspace is not None:
-                workspace.workflow_status = "recommendations_ready"
-                workspace.current_stage = "review"
-                workspace.updated_at = datetime.now(timezone.utc)
+            workspace.workflow_status = "recommendations_ready"
+            workspace.current_stage = "review"
+            workspace.updated_at = datetime.now(timezone.utc)
+    except LookupError:
+        raise
     except SQLAlchemyError as exc:
         raise PersistenceError("Generated recommendations could not be persisted.") from exc
 
@@ -353,15 +361,15 @@ def save_human_decision(
         raise PersistenceError("The human decision could not be persisted.") from exc
 
 
-def persist_audit_event(event: AuditEvent) -> bool:
+def persist_audit_event(event: AuditEvent) -> None:
     workspace_id = _parse_workspace_id(event.dataset_id)
     if workspace_id is None:
-        return False
+        raise PersistenceError("Dataset workspace metadata was not found.")
     try:
         with session_scope() as session:
             workspace = session.get(Workspace, workspace_id)
             if workspace is None:
-                return False
+                raise PersistenceError("Dataset workspace metadata was not found.")
             session.add(
                 AuditEventRecord(
                     workspace_id=workspace_id,
@@ -373,19 +381,21 @@ def persist_audit_event(event: AuditEvent) -> bool:
             )
             _apply_workflow_event(workspace, event.action, event.status)
             workspace.updated_at = event.timestamp
-            return True
+            session.flush()
+    except PersistenceError:
+        raise
     except SQLAlchemyError as exc:
         raise PersistenceError("The audit event could not be persisted.") from exc
 
 
-def read_persisted_audit_trail(dataset_id: str) -> DatasetAuditTrail | None:
+def read_persisted_audit_trail(dataset_id: str) -> DatasetAuditTrail:
     workspace_id = _parse_workspace_id(dataset_id)
     if workspace_id is None:
-        return None
+        raise PersistenceError("Dataset workspace metadata was not found.")
     try:
         with session_scope() as session:
             if session.get(Workspace, workspace_id) is None:
-                return None
+                raise PersistenceError("Dataset workspace metadata was not found.")
             rows = session.scalars(
                 select(AuditEventRecord)
                 .where(AuditEventRecord.workspace_id == workspace_id)
@@ -395,7 +405,11 @@ def read_persisted_audit_trail(dataset_id: str) -> DatasetAuditTrail | None:
                 dataset_id=dataset_id,
                 events=[
                     AuditEvent(
-                        timestamp=row.timestamp,
+                        timestamp=(
+                            row.timestamp
+                            if row.timestamp.tzinfo is not None
+                            else row.timestamp.replace(tzinfo=timezone.utc)
+                        ),
                         action=AuditAction(row.action),
                         status=AuditStatus(row.status),
                         dataset_id=dataset_id,
@@ -404,6 +418,8 @@ def read_persisted_audit_trail(dataset_id: str) -> DatasetAuditTrail | None:
                     for row in rows
                 ],
             )
+    except PersistenceError:
+        raise
     except SQLAlchemyError as exc:
         raise PersistenceError("The persisted audit trail could not be loaded.") from exc
 

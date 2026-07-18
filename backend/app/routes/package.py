@@ -124,16 +124,6 @@ def download_uploaded_dataset_package(dataset_id: str) -> FileResponse:
 
     zip_path = get_package_zip_path(workflow.package_directory)
     if not zip_path.is_file():
-        append_audit_event(
-            workflow.workspace_directory,
-            dataset_id=dataset_id,
-            action=AuditAction.PACKAGE_DOWNLOAD,
-            status=AuditStatus.FAILURE,
-            summary=(
-                "Package download could not start because no generated ZIP was "
-                "available."
-            ),
-        )
         raise HTTPException(
             status_code=409,
             detail=(
@@ -141,13 +131,6 @@ def download_uploaded_dataset_package(dataset_id: str) -> FileResponse:
                 "remediation and validation before downloading."
             ),
         )
-    append_audit_event(
-        workflow.workspace_directory,
-        dataset_id=dataset_id,
-        action=AuditAction.PACKAGE_DOWNLOAD,
-        status=AuditStatus.SUCCESS,
-        summary=f"Prepared a {zip_path.stat().st_size}-byte package ZIP for download.",
-    )
     return FileResponse(
         zip_path,
         media_type="application/zip",

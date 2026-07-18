@@ -10,7 +10,6 @@ from app.services.dataset_workspace import (
     UploadTooLargeError,
     create_dataset_workspace,
 )
-from app.services.workflow_repository import PersistenceError
 
 router = APIRouter(prefix="/api/datasets", tags=["datasets"])
 
@@ -33,7 +32,5 @@ async def upload_dataset(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except DatasetUploadError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except PersistenceError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
     finally:
         await file.close()

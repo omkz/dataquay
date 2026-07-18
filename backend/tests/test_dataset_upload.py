@@ -122,7 +122,7 @@ def test_upload_preserves_archive_and_originals_then_inspects_by_identifier(
     audit_response = client.get(f"/api/audit/datasets/{upload['dataset_id']}")
     assert audit_response.status_code == 200
     events = audit_response.json()["events"]
-    assert [event["action"] for event in events] == ["upload", "inspection"]
+    assert [event["action"] for event in events] == ["upload"]
     assert all(event["status"] == "success" for event in events)
     serialized_audit = audit_response.text
     assert "P001" not in serialized_audit

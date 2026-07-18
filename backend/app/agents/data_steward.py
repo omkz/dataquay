@@ -2,9 +2,10 @@ import os
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
-from pydantic_ai.exceptions import UserError
+from pydantic_ai.exceptions import AgentRunError, UserError
 from pydantic_ai.models import Model
 
+from app.api_errors import AIConfigurationError, AIServiceError
 from app.schemas import (
     ClarificationStatus,
     DatasetClarifications,
@@ -71,10 +72,6 @@ class RecommendationContext(BaseModel):
     confirmed_information: list[ConfirmedClarification] = Field(default_factory=list)
     unanswered_questions: list[OpenClarification] = Field(default_factory=list)
     deferred_questions: list[OpenClarification] = Field(default_factory=list)
-
-
-class AIConfigurationError(RuntimeError):
-    """Raised when the Data Steward Agent cannot be configured safely."""
 
 
 def get_configured_model_name() -> str:
@@ -155,6 +152,10 @@ async def generate_recommendations(
         )
     except UserError as exc:
         raise AIConfigurationError(f"Invalid AI model configuration: {exc}") from exc
+    except AgentRunError as exc:
+        raise AIServiceError(
+            "The AI recommendation provider is unavailable or returned an invalid response."
+        ) from exc
 
     return result.output
 

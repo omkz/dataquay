@@ -103,6 +103,7 @@ export function RecommendationsPanel({
       }
     } else if (
       state.status === "configuration_error" ||
+      state.status === "database_error" ||
       state.status === "error"
     ) {
       reportWorkflowProgress(
@@ -175,6 +176,12 @@ export function RecommendationsPanel({
             kind="configuration"
             title="AI configuration required"
             message={state.message ?? "Configure the backend AI model to continue."}
+          />
+        ) : state.status === "database_error" ? (
+          <RecommendationNotice
+            kind="database"
+            title="Workflow database unavailable"
+            message={state.message ?? "Restore PostgreSQL connectivity to continue."}
           />
         ) : state.status === "error" ? (
           <RecommendationNotice
@@ -402,14 +409,14 @@ function RecommendationNotice({
   title,
   message,
 }: {
-  kind: "configuration" | "error";
+  kind: "configuration" | "database" | "error";
   title: string;
   message: string;
 }) {
   return (
     <div className={`recommendation-state recommendation-${kind}`} role="alert">
       <span className="recommendation-state-mark" aria-hidden="true">
-        {kind === "configuration" ? "CFG" : "!"}
+        {kind === "configuration" ? "CFG" : kind === "database" ? "DB" : "!"}
       </span>
       <div>
         <strong>{title}</strong>

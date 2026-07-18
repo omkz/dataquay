@@ -9,8 +9,7 @@ from app.routes.package import router as package_router
 from app.routes.remediate import router as remediate_router
 from app.routes.validation import router as validation_router
 from app.routes.workspaces import router as workspaces_router
-from app.services.audit_trail import AuditTrailError
-from app.services.workflow_repository import PersistenceError
+from app.api_errors import ServiceUnavailableError
 
 app = FastAPI(title="DataQuay API")
 app.include_router(audit_router)
@@ -23,13 +22,15 @@ app.include_router(validation_router)
 app.include_router(workspaces_router)
 
 
-@app.exception_handler(PersistenceError)
-@app.exception_handler(AuditTrailError)
-def persistence_exception_handler(
+@app.exception_handler(ServiceUnavailableError)
+def service_unavailable_exception_handler(
     _request: Request,
-    exc: PersistenceError | AuditTrailError,
+    exc: ServiceUnavailableError,
 ) -> JSONResponse:
-    return JSONResponse(status_code=503, content={"detail": str(exc)})
+    return JSONResponse(
+        status_code=503,
+        content={"code": exc.error_code.value, "detail": str(exc)},
+    )
 
 
 @app.get("/health")

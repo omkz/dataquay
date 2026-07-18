@@ -133,3 +133,33 @@ def test_workspace_can_be_listed_and_reopened_with_persisted_review_state(
 
     assert (workspace / "archive" / "upload.zip").is_file()
     assert (workspace / "original" / "participants.csv").is_file()
+
+
+def test_read_only_requests_do_not_change_workspace_or_audit_history(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage_root = tmp_path / "datasets"
+    monkeypatch.setenv("DATAQUAY_DATA_ROOT", str(storage_root))
+    upload = client.post(
+        "/api/datasets/upload",
+        files={"file": ("read-only.zip", _sample_archive(), "application/zip")},
+    )
+    assert upload.status_code == 201
+    dataset_id = upload.json()["dataset_id"]
+    before_workspace = client.get(f"/api/workspaces/{dataset_id}").json()
+    before_audit = client.get(f"/api/audit/datasets/{dataset_id}").json()
+
+    assert client.get(f"/api/inspect/datasets/{dataset_id}").status_code == 200
+    assert client.get(f"/api/clarify/datasets/{dataset_id}").status_code == 200
+    assert client.get("/api/workspaces").status_code == 200
+    assert client.get(f"/api/workspaces/{dataset_id}").status_code == 200
+    assert client.get(f"/api/audit/datasets/{dataset_id}").status_code == 200
+    assert client.get(f"/api/package/datasets/{dataset_id}/download").status_code == 409
+
+    after_workspace = client.get(f"/api/workspaces/{dataset_id}").json()
+    after_audit = client.get(f"/api/audit/datasets/{dataset_id}").json()
+    assert after_workspace["workflow_status"] == before_workspace["workflow_status"]
+    assert after_workspace["current_stage"] == before_workspace["current_stage"]
+    assert after_workspace["updated_at"] == before_workspace["updated_at"]
+    assert after_audit == before_audit

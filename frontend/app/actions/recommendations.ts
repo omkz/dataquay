@@ -2,6 +2,7 @@
 
 import {
   getBackendUrl,
+  getBackendApiError,
   isDatasetIdentifier,
   isRecommendationResponse,
   type RecommendationActionState,
@@ -39,13 +40,25 @@ export async function generateRecommendations(
     );
     const payload: unknown = await readJsonResponse(response);
 
-    if (response.status === 503) {
+    const backendError = getBackendApiError(payload);
+    if (backendError?.code === "ai_not_configured") {
       return {
         status: "configuration_error",
         recommendations: [],
         generation: previousState.generation,
-        message:
-          "AI recommendations are not configured. Set DATAQUAY_AI_MODEL and the provider API key in the backend environment, then try again.",
+        message: backendError.message,
+      };
+    }
+
+    if (
+      backendError?.code === "database_not_configured" ||
+      backendError?.code === "database_unavailable"
+    ) {
+      return {
+        status: "database_error",
+        recommendations: [],
+        generation: previousState.generation,
+        message: backendError.message,
       };
     }
 
@@ -54,7 +67,9 @@ export async function generateRecommendations(
         status: "error",
         recommendations: [],
         generation: previousState.generation,
-        message: `The recommendation service returned HTTP ${response.status}. Please try again.`,
+        message:
+          backendError?.message ??
+          `The recommendation service returned HTTP ${response.status}. Please try again.`,
       };
     }
 

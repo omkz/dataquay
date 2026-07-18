@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.api_errors import DatabaseConfigurationError
+
 DATAQUAY_DATABASE_URL_ENV = "DATAQUAY_DATABASE_URL"
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
@@ -20,7 +22,7 @@ load_dotenv(BACKEND_ROOT / ".env", override=False)
 def get_database_url() -> str:
     database_url = os.getenv(DATAQUAY_DATABASE_URL_ENV, "").strip()
     if not database_url:
-        raise RuntimeError(
+        raise DatabaseConfigurationError(
             "DATAQUAY_DATABASE_URL is not configured. Set it in the backend "
             "environment or backend/.env."
         )

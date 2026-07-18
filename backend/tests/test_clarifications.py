@@ -193,7 +193,6 @@ def test_uploaded_clarification_api_preserves_originals_audits_activity_and_info
     actions = [event["action"] for event in audit_response.json()["events"]]
     assert actions == [
         "upload",
-        "clarification_review",
         "clarification_response",
         "clarification_response",
         "recommendation_generation",

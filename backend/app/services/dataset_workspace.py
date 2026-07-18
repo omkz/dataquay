@@ -9,6 +9,7 @@ from zipfile import BadZipFile, ZipFile, ZipInfo
 from fastapi import UploadFile
 from pydantic import ValidationError
 
+from app.api_errors import DatabaseError
 from app.schemas import (
     AuditAction,
     AuditStatus,
@@ -19,7 +20,6 @@ from app.services.audit_trail import append_audit_event
 from app.services.dataset_inspector import inspect_dataset
 from app.services.remediation_apply import calculate_file_checksum
 from app.services.workflow_repository import (
-    PersistenceError,
     create_workspace_record,
     delete_workspace_record,
 )
@@ -140,7 +140,7 @@ async def create_dataset_workspace(
         except Exception:
             try:
                 delete_workspace_record(dataset_id)
-            except PersistenceError:
+            except DatabaseError:
                 pass
             shutil.rmtree(final_root, ignore_errors=True)
             raise
