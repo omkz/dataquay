@@ -87,11 +87,12 @@ def test_upload_preserves_archive_and_originals_then_inspects_by_identifier(
     assert participants.stat().st_mode & stat.S_IWUSR == 0
     assert readme.stat().st_mode & stat.S_IWUSR == 0
 
-    before_inspection = {
-        path.relative_to(workspace): path.read_bytes()
-        for path in workspace.rglob("*")
+    original_before_inspection = {
+        path.relative_to(workspace / "original"): path.read_bytes()
+        for path in (workspace / "original").rglob("*")
         if path.is_file()
     }
+    archive_before_inspection = stored_archive.read_bytes()
     inspection_response = client.get(upload["inspection_url"])
 
     assert inspection_response.status_code == 200
@@ -108,10 +109,20 @@ def test_upload_preserves_archive_and_originals_then_inspects_by_identifier(
     ]
     assert inspection["files"][1]["csv_profile"]["row_count"] == 2
     assert {
-        path.relative_to(workspace): path.read_bytes()
-        for path in workspace.rglob("*")
+        path.relative_to(workspace / "original"): path.read_bytes()
+        for path in (workspace / "original").rglob("*")
         if path.is_file()
-    } == before_inspection
+    } == original_before_inspection
+    assert stored_archive.read_bytes() == archive_before_inspection
+
+    audit_response = client.get(f"/api/audit/datasets/{upload['dataset_id']}")
+    assert audit_response.status_code == 200
+    events = audit_response.json()["events"]
+    assert [event["action"] for event in events] == ["upload", "inspection"]
+    assert all(event["status"] == "success" for event in events)
+    serialized_audit = audit_response.text
+    assert "P001" not in serialized_audit
+    assert "participant_id,value" not in serialized_audit
 
 
 @pytest.mark.parametrize(

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AuditTimeline } from "@/app/components/AuditTimeline";
 import { RecommendationsPanel } from "@/app/components/RecommendationsPanel";
 import type {
   DatasetInspection,
@@ -199,6 +200,7 @@ export function DatasetOverview({
         </section>
 
         <RecommendationsPanel datasetId={datasetId} />
+        {datasetId ? <AuditTimeline datasetId={datasetId} /> : null}
       </main>
 
       <footer className="site-footer">

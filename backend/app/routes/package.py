@@ -3,7 +3,8 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
-from app.schemas import PackageGenerationResult
+from app.schemas import AuditAction, AuditStatus, PackageGenerationResult
+from app.services.audit_trail import append_audit_event
 from app.services.dataset_workspace import DatasetNotFoundError
 from app.services.dataset_workflow import resolve_dataset_workflow_workspace
 from app.services.package_generator import (
@@ -70,17 +71,48 @@ def generate_uploaded_dataset_package(
 ) -> PackageGenerationResult:
     try:
         workflow = resolve_dataset_workflow_workspace(dataset_id)
-        return generate_dataset_package(
+    except DatasetNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    try:
+        package = generate_dataset_package(
             workflow.source_directory,
             workflow.working_copy_directory,
             workflow.package_directory,
             dataset_name=workflow.dataset_name,
             download_url=workflow.package_download_url,
         )
-    except DatasetNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except PackageGenerationError as exc:
+        append_audit_event(
+            workflow.workspace_directory,
+            dataset_id=dataset_id,
+            action=AuditAction.PACKAGE_GENERATION,
+            status=AuditStatus.FAILURE,
+            summary=(
+                "Package generation stopped because workflow prerequisites or "
+                "checksum verification were incomplete."
+            ),
+        )
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception:
+        append_audit_event(
+            workflow.workspace_directory,
+            dataset_id=dataset_id,
+            action=AuditAction.PACKAGE_GENERATION,
+            status=AuditStatus.FAILURE,
+            summary="Package generation failed before a downloadable ZIP was created.",
+        )
+        raise
+    append_audit_event(
+        workflow.workspace_directory,
+        dataset_id=dataset_id,
+        action=AuditAction.PACKAGE_GENERATION,
+        status=AuditStatus.SUCCESS,
+        summary=(
+            f"Generated a validated package containing {len(package.files)} files "
+            f"and a {package.zip_size_bytes}-byte ZIP."
+        ),
+    )
+    return package
 
 
 @router.get("/datasets/{dataset_id}/download", response_class=FileResponse)
@@ -92,6 +124,16 @@ def download_uploaded_dataset_package(dataset_id: str) -> FileResponse:
 
     zip_path = get_package_zip_path(workflow.package_directory)
     if not zip_path.is_file():
+        append_audit_event(
+            workflow.workspace_directory,
+            dataset_id=dataset_id,
+            action=AuditAction.PACKAGE_DOWNLOAD,
+            status=AuditStatus.FAILURE,
+            summary=(
+                "Package download could not start because no generated ZIP was "
+                "available."
+            ),
+        )
         raise HTTPException(
             status_code=409,
             detail=(
@@ -99,6 +141,13 @@ def download_uploaded_dataset_package(dataset_id: str) -> FileResponse:
                 "remediation and validation before downloading."
             ),
         )
+    append_audit_event(
+        workflow.workspace_directory,
+        dataset_id=dataset_id,
+        action=AuditAction.PACKAGE_DOWNLOAD,
+        status=AuditStatus.SUCCESS,
+        summary=f"Prepared a {zip_path.stat().st_size}-byte package ZIP for download.",
+    )
     return FileResponse(
         zip_path,
         media_type="application/zip",

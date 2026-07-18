@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 
 import { generateRecommendations } from "@/app/actions/recommendations";
+import { notifyDatasetAuditUpdated } from "@/app/components/AuditTimeline";
 import { RemediationWorkflow } from "@/app/components/RemediationWorkflow";
 import type {
   RecommendationActionState,
@@ -22,6 +23,12 @@ export function RecommendationsPanel({ datasetId }: { datasetId?: string }) {
     generateRecommendations,
     initialState,
   );
+
+  useEffect(() => {
+    if (!pending && state.status !== "idle") {
+      notifyDatasetAuditUpdated(datasetId);
+    }
+  }, [datasetId, pending, state.status, state.generation]);
 
   return (
     <section className="content-section" aria-labelledby="recommendations-title">

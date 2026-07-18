@@ -9,7 +9,13 @@ from zipfile import BadZipFile, ZipFile, ZipInfo
 from fastapi import UploadFile
 from pydantic import ValidationError
 
-from app.schemas import DatasetInspection, DatasetUploadResponse
+from app.schemas import (
+    AuditAction,
+    AuditStatus,
+    DatasetInspection,
+    DatasetUploadResponse,
+)
+from app.services.audit_trail import append_audit_event
 from app.services.dataset_inspector import inspect_dataset
 from app.services.remediation_apply import calculate_file_checksum
 
@@ -108,6 +114,16 @@ async def create_dataset_workspace(
             json.dumps(response.model_dump(mode="json"), indent=2, sort_keys=True)
             + "\n",
             encoding="utf-8",
+        )
+        append_audit_event(
+            staging_root,
+            dataset_id=dataset_id,
+            action=AuditAction.UPLOAD,
+            status=AuditStatus.SUCCESS,
+            summary=(
+                f"Dataset archive accepted with {extracted_file_count} extracted "
+                f"files totaling {extracted_size} bytes."
+            ),
         )
         archive_path.chmod(0o444)
         for extracted_file in original_directory.rglob("*"):

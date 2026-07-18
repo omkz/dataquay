@@ -3,13 +3,21 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 
 from app.agents.data_steward import AIConfigurationError, generate_recommendations
-from app.schemas import CsvProfile, DatasetInspection, RecommendationResponse
+from app.schemas import (
+    AuditAction,
+    AuditStatus,
+    CsvProfile,
+    DatasetInspection,
+    RecommendationResponse,
+)
+from app.services.audit_trail import append_audit_event
 from app.services.csv_profiler import profile_csv
 from app.services.dataset_inspector import inspect_dataset
 from app.services.dataset_workspace import (
     DatasetNotFoundError,
     inspect_dataset_workspace,
 )
+from app.services.dataset_workflow import resolve_dataset_workflow_workspace
 
 router = APIRouter(prefix="/api/inspect", tags=["inspection"])
 
@@ -32,9 +40,31 @@ def inspect_sample_dataset() -> DatasetInspection:
 @router.get("/datasets/{dataset_id}", response_model=DatasetInspection)
 def inspect_uploaded_dataset(dataset_id: str) -> DatasetInspection:
     try:
-        return inspect_dataset_workspace(dataset_id)
+        workflow = resolve_dataset_workflow_workspace(dataset_id)
     except DatasetNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    try:
+        inspection = inspect_dataset_workspace(dataset_id)
+    except Exception:
+        append_audit_event(
+            workflow.workspace_directory,
+            dataset_id=dataset_id,
+            action=AuditAction.INSPECTION,
+            status=AuditStatus.FAILURE,
+            summary="Dataset inspection failed before results were available.",
+        )
+        raise
+    append_audit_event(
+        workflow.workspace_directory,
+        dataset_id=dataset_id,
+        action=AuditAction.INSPECTION,
+        status=AuditStatus.SUCCESS,
+        summary=(
+            f"Inspected {inspection.summary.total_file_count} files and produced "
+            f"{inspection.readiness.total_finding_count} deterministic findings."
+        ),
+    )
+    return inspection
 
 
 @router.post(
@@ -57,10 +87,41 @@ async def recommend_uploaded_dataset_remediation(
     dataset_id: str,
 ) -> RecommendationResponse:
     try:
+        workflow = resolve_dataset_workflow_workspace(dataset_id)
         inspection = inspect_dataset_workspace(dataset_id)
     except DatasetNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     try:
-        return await generate_recommendations(inspection)
+        recommendations = await generate_recommendations(inspection)
     except AIConfigurationError as exc:
+        append_audit_event(
+            workflow.workspace_directory,
+            dataset_id=dataset_id,
+            action=AuditAction.RECOMMENDATION_GENERATION,
+            status=AuditStatus.FAILURE,
+            summary=(
+                "Recommendation generation could not run because AI "
+                "configuration was unavailable."
+            ),
+        )
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception:
+        append_audit_event(
+            workflow.workspace_directory,
+            dataset_id=dataset_id,
+            action=AuditAction.RECOMMENDATION_GENERATION,
+            status=AuditStatus.FAILURE,
+            summary="Recommendation generation failed without returning proposals.",
+        )
+        raise
+    append_audit_event(
+        workflow.workspace_directory,
+        dataset_id=dataset_id,
+        action=AuditAction.RECOMMENDATION_GENERATION,
+        status=AuditStatus.SUCCESS,
+        summary=(
+            f"Generated {len(recommendations.recommendations)} masked, "
+            "proposal-only recommendations for human review."
+        ),
+    )
+    return recommendations

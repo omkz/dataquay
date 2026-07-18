@@ -2,7 +2,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from app.schemas import DatasetValidationResult
+from app.schemas import AuditAction, AuditStatus, DatasetValidationResult
+from app.services.audit_trail import append_audit_event
 from app.services.dataset_workspace import DatasetNotFoundError
 from app.services.dataset_workflow import resolve_dataset_workflow_workspace
 from app.services.remediation_validation import (
@@ -46,11 +47,43 @@ def validate_uploaded_dataset_remediation(
 ) -> DatasetValidationResult:
     try:
         workflow = resolve_dataset_workflow_workspace(dataset_id)
-        return validate_remediated_dataset(
+    except DatasetNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    try:
+        validation = validate_remediated_dataset(
             workflow.source_directory,
             workflow.working_copy_directory,
         )
-    except DatasetNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValidationUnavailableError as exc:
+        append_audit_event(
+            workflow.workspace_directory,
+            dataset_id=dataset_id,
+            action=AuditAction.VALIDATION,
+            status=AuditStatus.FAILURE,
+            summary=(
+                "Validation could not run because the working copy or checksum "
+                "manifest was unavailable."
+            ),
+        )
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception:
+        append_audit_event(
+            workflow.workspace_directory,
+            dataset_id=dataset_id,
+            action=AuditAction.VALIDATION,
+            status=AuditStatus.FAILURE,
+            summary="Validation failed before checksum and finding results were available.",
+        )
+        raise
+    append_audit_event(
+        workflow.workspace_directory,
+        dataset_id=dataset_id,
+        action=AuditAction.VALIDATION,
+        status=AuditStatus.SUCCESS,
+        summary=(
+            f"Validation resolved {len(validation.resolved_findings)} findings, "
+            f"left {len(validation.remaining_findings)} remaining, and reported "
+            f"readiness as {validation.readiness.status.value}."
+        ),
+    )
+    return validation

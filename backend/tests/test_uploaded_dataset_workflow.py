@@ -181,6 +181,24 @@ def test_uploaded_dataset_completes_workflow_without_changing_originals(
     assert stale_download_response.status_code == 409
     assert "has not been generated yet" in stale_download_response.json()["detail"]
 
+    audit_response = client.get(f"/api/audit/datasets/{dataset_id}")
+    assert audit_response.status_code == 200
+    events = audit_response.json()["events"]
+    assert [(event["action"], event["status"]) for event in events] == [
+        ("upload", "success"),
+        ("recommendation_generation", "success"),
+        ("remediation_preview", "success"),
+        ("remediation_apply", "success"),
+        ("validation", "success"),
+        ("package_generation", "success"),
+        ("package_download", "success"),
+        ("remediation_apply", "success"),
+        ("package_download", "failure"),
+    ]
+    audit_content = (workspace / "audit" / "events.jsonl").read_text()
+    assert "alice@example.com" not in audit_content
+    assert "P001" not in audit_content
+
     assert _directory_contents(original_directory) == original_before
     assert (workspace / "archive" / "upload.zip").read_bytes() == archive_before
 
@@ -204,6 +222,13 @@ def test_uploaded_workflow_reports_missing_prerequisites(
     assert "apply remediation first" in generation_response.json()["detail"]
     assert download_response.status_code == 409
     assert "has not been generated yet" in download_response.json()["detail"]
+    audit_response = client.get(f"/api/audit/datasets/{dataset_id}")
+    assert [(event["action"], event["status"]) for event in audit_response.json()["events"]] == [
+        ("upload", "success"),
+        ("validation", "failure"),
+        ("package_generation", "failure"),
+        ("package_download", "failure"),
+    ]
 
 
 @pytest.mark.parametrize(
@@ -215,6 +240,7 @@ def test_uploaded_workflow_reports_missing_prerequisites(
         ("post", "/api/validate/datasets/{id}"),
         ("post", "/api/package/datasets/{id}"),
         ("get", "/api/package/datasets/{id}/download"),
+        ("get", "/api/audit/datasets/{id}"),
     ],
 )
 def test_uploaded_workflow_rejects_unknown_dataset_identifiers(

@@ -1989,6 +1989,161 @@ tbody tr:last-child td {
   font-size: 8px;
 }
 
+.audit-heading {
+  align-items: end;
+}
+
+.audit-refresh {
+  min-height: 40px;
+  flex: none;
+  padding: 0 15px;
+  border: 1px solid #b8cbc2;
+  border-radius: 9px;
+  background: white;
+  color: var(--brand-dark);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.audit-refresh:hover:not(:disabled) {
+  border-color: var(--brand);
+  background: #f3f9f6;
+}
+
+.audit-refresh:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.audit-timeline {
+  display: grid;
+  max-width: 900px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.audit-timeline li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 14px;
+  padding-bottom: 15px;
+}
+
+.audit-timeline li:not(:last-child)::before {
+  position: absolute;
+  top: 17px;
+  bottom: -2px;
+  left: 12px;
+  width: 1px;
+  background: #cdd8d3;
+  content: "";
+}
+
+.audit-marker {
+  z-index: 1;
+  display: block;
+  width: 11px;
+  height: 11px;
+  margin: 11px auto 0;
+  border: 2px solid var(--canvas);
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px #b9c8c1;
+}
+
+.audit-marker-success {
+  background: var(--brand);
+}
+
+.audit-marker-failure {
+  background: var(--high);
+}
+
+.audit-event {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgb(255 255 255 / 72%);
+}
+
+.audit-event-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.audit-event-topline strong {
+  font-size: 12px;
+}
+
+.audit-status {
+  padding: 4px 7px;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.audit-status-success {
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+}
+
+.audit-status-failure {
+  background: #f8e8e4;
+  color: var(--high);
+}
+
+.audit-event p {
+  margin: 7px 0 9px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.audit-event time {
+  color: #7b8781;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 8px;
+}
+
+.audit-state {
+  padding: 24px;
+  border: 1px dashed #c5d3cc;
+  border-radius: 11px;
+  background: rgb(255 255 255 / 55%);
+}
+
+.audit-state strong {
+  font-size: 12px;
+}
+
+.audit-state p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.audit-error {
+  border-color: #e2b9b1;
+  background: #fff4f2;
+  color: var(--high);
+}
+
+.audit-loading {
+  display: grid;
+  max-width: 900px;
+  gap: 10px;
+}
+
+.audit-loading .skeleton {
+  height: 78px;
+}
+
 .site-footer {
   display: flex;
   justify-content: space-between;
@@ -2270,9 +2425,14 @@ tbody tr:last-child td {
 
   .workflow-heading,
   .checksum-banner,
-  .package-result {
+  .package-result,
+  .audit-heading {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .audit-refresh {
+    width: 100%;
   }
 
   .workflow-step-action {

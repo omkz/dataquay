@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, Field
@@ -84,6 +85,35 @@ class DatasetUploadResponse(BaseModel):
     extracted_file_count: int
     extracted_size_bytes: int
     inspection_url: str
+
+
+class AuditAction(StrEnum):
+    UPLOAD = "upload"
+    INSPECTION = "inspection"
+    RECOMMENDATION_GENERATION = "recommendation_generation"
+    REMEDIATION_PREVIEW = "remediation_preview"
+    REMEDIATION_APPLY = "remediation_apply"
+    VALIDATION = "validation"
+    PACKAGE_GENERATION = "package_generation"
+    PACKAGE_DOWNLOAD = "package_download"
+
+
+class AuditStatus(StrEnum):
+    SUCCESS = "success"
+    FAILURE = "failure"
+
+
+class AuditEvent(BaseModel):
+    timestamp: datetime
+    action: AuditAction
+    status: AuditStatus
+    dataset_id: str
+    summary: str = Field(min_length=1, max_length=500)
+
+
+class DatasetAuditTrail(BaseModel):
+    dataset_id: str
+    events: list[AuditEvent]
 
 
 class FindingReference(BaseModel):

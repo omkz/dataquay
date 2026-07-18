@@ -3,10 +3,13 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 
 from app.schemas import (
+    AuditAction,
+    AuditStatus,
     RemediationApplyResponse,
     RemediationPreviewRequest,
     RemediationPreviewResponse,
 )
+from app.services.audit_trail import append_audit_event
 from app.services.dataset_inspector import inspect_dataset
 from app.services.dataset_workspace import DatasetNotFoundError
 from app.services.dataset_workflow import (
@@ -76,15 +79,50 @@ def preview_uploaded_dataset_remediation(
 ) -> RemediationPreviewResponse:
     try:
         workflow = resolve_dataset_workflow_workspace(dataset_id)
+    except DatasetNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    try:
         inspection = inspect_dataset(workflow.source_directory)
-        return preview_remediation_actions(
+        preview = preview_remediation_actions(
             request.approved_recommendations,
             inspection.findings,
         )
-    except DatasetNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except UnknownFindingReferenceError as exc:
+        append_audit_event(
+            workflow.workspace_directory,
+            dataset_id=dataset_id,
+            action=AuditAction.REMEDIATION_PREVIEW,
+            status=AuditStatus.FAILURE,
+            summary=(
+                "Remediation preview was rejected because an approved proposal "
+                "did not match a current finding."
+            ),
+        )
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception:
+        append_audit_event(
+            workflow.workspace_directory,
+            dataset_id=dataset_id,
+            action=AuditAction.REMEDIATION_PREVIEW,
+            status=AuditStatus.FAILURE,
+            summary="Remediation preview failed before actions were classified.",
+        )
+        raise
+    automatic_count = sum(
+        action.can_apply_automatically for action in preview.actions
+    )
+    append_audit_event(
+        workflow.workspace_directory,
+        dataset_id=dataset_id,
+        action=AuditAction.REMEDIATION_PREVIEW,
+        status=AuditStatus.SUCCESS,
+        summary=(
+            f"Previewed {len(preview.actions)} approved actions: "
+            f"{automatic_count} automatic and "
+            f"{len(preview.actions) - automatic_count} manual."
+        ),
+    )
+    return preview
 
 
 @router.post(
@@ -97,14 +135,45 @@ def apply_uploaded_dataset_remediation(
 ) -> RemediationApplyResponse:
     try:
         workflow = resolve_dataset_workflow_workspace(dataset_id)
+    except DatasetNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    try:
         result = apply_approved_remediation_actions(
             request.approved_recommendations,
             workflow.source_directory,
             workflow.working_copy_directory,
         )
         invalidate_generated_package(workflow)
-        return result
-    except DatasetNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except UnknownFindingReferenceError as exc:
+        append_audit_event(
+            workflow.workspace_directory,
+            dataset_id=dataset_id,
+            action=AuditAction.REMEDIATION_APPLY,
+            status=AuditStatus.FAILURE,
+            summary=(
+                "Remediation apply was rejected because an approved proposal "
+                "did not match a current finding."
+            ),
+        )
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception:
+        append_audit_event(
+            workflow.workspace_directory,
+            dataset_id=dataset_id,
+            action=AuditAction.REMEDIATION_APPLY,
+            status=AuditStatus.FAILURE,
+            summary="Remediation failed while preparing or updating the working copy.",
+        )
+        raise
+    append_audit_event(
+        workflow.workspace_directory,
+        dataset_id=dataset_id,
+        action=AuditAction.REMEDIATION_APPLY,
+        status=AuditStatus.SUCCESS,
+        summary=(
+            f"Applied {len(result.applied_actions)} safe actions, skipped "
+            f"{len(result.skipped_actions)}, and recorded "
+            f"{len(result.failed_actions)} failed actions in the working copy."
+        ),
+    )
+    return result

@@ -8,6 +8,7 @@ import {
   previewApprovedRemediation,
   validateAppliedRemediation,
 } from "@/app/actions/remediation-workflow";
+import { notifyDatasetAuditUpdated } from "@/app/components/AuditTimeline";
 import type {
   DatasetValidationResult,
   InspectionFinding,
@@ -78,6 +79,7 @@ export function RemediationWorkflow({
               prerequisite: result.prerequisite,
             },
       );
+      notifyDatasetAuditUpdated(datasetId);
       setActiveStep(null);
     });
   }
@@ -100,6 +102,7 @@ export function RemediationWorkflow({
               prerequisite: result.prerequisite,
             },
       );
+      notifyDatasetAuditUpdated(datasetId);
       setActiveStep(null);
     });
   }
@@ -118,6 +121,7 @@ export function RemediationWorkflow({
               prerequisite: result.prerequisite,
             },
       );
+      notifyDatasetAuditUpdated(datasetId);
       setActiveStep(null);
     });
   }
@@ -135,6 +139,7 @@ export function RemediationWorkflow({
               prerequisite: result.prerequisite,
             },
       );
+      notifyDatasetAuditUpdated(datasetId);
       setActiveStep(null);
     });
   }
@@ -592,6 +597,7 @@ function PackageResult({
         ? `/api/datasets/${encodeURIComponent(datasetId)}/package`
         : "/api/sample-package";
       const response = await fetch(downloadPath, { cache: "no-store" });
+      notifyDatasetAuditUpdated(datasetId);
       if (!response.ok) {
         const payload: unknown = await response.json().catch(() => null);
         const detail =

@@ -59,6 +59,29 @@ export type DatasetUploadResponse = {
   inspection_url: string;
 };
 
+export type AuditAction =
+  | "upload"
+  | "inspection"
+  | "recommendation_generation"
+  | "remediation_preview"
+  | "remediation_apply"
+  | "validation"
+  | "package_generation"
+  | "package_download";
+
+export type AuditEvent = {
+  timestamp: string;
+  action: AuditAction;
+  status: "success" | "failure";
+  dataset_id: string;
+  summary: string;
+};
+
+export type DatasetAuditTrail = {
+  dataset_id: string;
+  events: AuditEvent[];
+};
+
 export type FindingReference = {
   type: string;
   file: string;
@@ -205,6 +228,18 @@ export function isDatasetUploadResponse(
   );
 }
 
+export function isDatasetAuditTrail(
+  value: unknown,
+): value is DatasetAuditTrail {
+  return Boolean(
+    isRecord(value) &&
+      typeof value.dataset_id === "string" &&
+      isDatasetIdentifier(value.dataset_id) &&
+      Array.isArray(value.events) &&
+      value.events.every(isAuditEvent),
+  );
+}
+
 async function getDatasetInspection(path: string): Promise<InspectionResult> {
   const backendUrl = getBackendUrl();
 
@@ -245,6 +280,29 @@ export function isDatasetIdentifier(value: string) {
     value,
   );
 }
+
+function isAuditEvent(value: unknown): value is AuditEvent {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.timestamp === "string" &&
+    auditActions.has(value.action as AuditAction) &&
+    (value.status === "success" || value.status === "failure") &&
+    typeof value.dataset_id === "string" &&
+    isDatasetIdentifier(value.dataset_id) &&
+    typeof value.summary === "string"
+  );
+}
+
+const auditActions = new Set<AuditAction>([
+  "upload",
+  "inspection",
+  "recommendation_generation",
+  "remediation_preview",
+  "remediation_apply",
+  "validation",
+  "package_generation",
+  "package_download",
+]);
 
 export function isRecommendationResponse(
   value: unknown,
