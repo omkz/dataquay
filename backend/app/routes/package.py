@@ -136,6 +136,16 @@ def download_uploaded_dataset_package(
                 "remediation and validation before downloading."
             ),
         )
+    append_audit_event(
+        workflow.workspace_directory,
+        dataset_id=dataset_id,
+        action=AuditAction.PACKAGE_DOWNLOAD,
+        status=AuditStatus.SUCCESS,
+        summary=(
+            f"Served an authorized download of the validated "
+            f"{zip_path.stat().st_size}-byte package ZIP."
+        ),
+    )
     return FileResponse(
         zip_path,
         media_type="application/zip",

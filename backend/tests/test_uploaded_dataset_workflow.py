@@ -192,6 +192,7 @@ def test_uploaded_dataset_completes_workflow_without_changing_originals(
         ("remediation_apply", "success"),
         ("validation", "success"),
         ("package_generation", "success"),
+        ("package_download", "success"),
         ("remediation_apply", "success"),
     ]
     audit_content = (workspace / "audit" / "events.jsonl").read_text()
