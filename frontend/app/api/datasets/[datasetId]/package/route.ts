@@ -1,4 +1,5 @@
-import { getBackendUrl, isDatasetIdentifier } from "@/lib/dataquay";
+import { authenticatedBackendFetch } from "@/lib/backend-fetch";
+import { isDatasetIdentifier } from "@/lib/dataquay";
 
 export async function GET(
   _request: Request,
@@ -13,8 +14,8 @@ export async function GET(
   }
 
   try {
-    const response = await fetch(
-      `${getBackendUrl()}/api/package/datasets/${encodeURIComponent(datasetId)}/download`,
+    const response = await authenticatedBackendFetch(
+      `/api/package/datasets/${encodeURIComponent(datasetId)}/download`,
       { cache: "no-store", headers: { Accept: "application/zip" } },
     );
 

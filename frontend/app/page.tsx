@@ -7,7 +7,7 @@ import {
   getUploadedDatasetInspection,
   getWorkspaceDetail,
   getWorkspaceList,
-} from "@/lib/dataquay";
+} from "@/lib/backend-api";
 
 export default async function Home({
   searchParams,

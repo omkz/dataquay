@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { AuthSessionBar } from "@/app/components/AuthSessionBar";
+import { auth } from "@/auth";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -17,17 +19,22 @@ export const metadata: Metadata = {
   description: "Upload and inspect research datasets with deterministic stewardship checks.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
+
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body>{children}</body>
+      <body>
+        {session?.user ? <AuthSessionBar user={session.user} /> : null}
+        {children}
+      </body>
     </html>
   );
 }

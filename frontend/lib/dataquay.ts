@@ -174,6 +174,7 @@ export type RecommendationActionState = {
 };
 
 export type BackendErrorCode =
+  | "auth_not_configured"
   | "database_not_configured"
   | "database_unavailable"
   | "ai_not_configured"
@@ -272,89 +273,6 @@ export function getBackendUrl() {
   );
 }
 
-export async function getSampleDatasetInspection(): Promise<InspectionResult> {
-  return getDatasetInspection("/api/inspect/sample-dataset");
-}
-
-export async function getUploadedDatasetInspection(
-  datasetId: string,
-): Promise<InspectionResult> {
-  if (!isDatasetIdentifier(datasetId)) {
-    return {
-      ok: false,
-      message:
-        "The dataset identifier is invalid. Upload the dataset again to create a new workspace.",
-    };
-  }
-  return getDatasetInspection(
-    `/api/inspect/datasets/${encodeURIComponent(datasetId)}`,
-  );
-}
-
-export async function getWorkspaceList(): Promise<WorkspaceListResult> {
-  try {
-    const response = await fetch(`${getBackendUrl()}/api/workspaces`, {
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-    });
-    const payload: unknown = await response.json().catch(() => null);
-    if (!response.ok) {
-      return {
-        ok: false,
-        message: extractApiDetail(
-          payload,
-          `Workspace history returned HTTP ${response.status}.`,
-        ),
-      };
-    }
-    if (!isRecord(payload) || !Array.isArray(payload.workspaces)) {
-      return { ok: false, message: "Workspace history returned an unexpected response." };
-    }
-    if (!payload.workspaces.every(isWorkspaceSummary)) {
-      return { ok: false, message: "Workspace history contains invalid records." };
-    }
-    return { ok: true, data: payload.workspaces };
-  } catch {
-    return {
-      ok: false,
-      message: "Workspace history is unavailable. Confirm that the backend and PostgreSQL are running.",
-    };
-  }
-}
-
-export async function getWorkspaceDetail(
-  datasetId: string,
-): Promise<WorkspaceDetailResult> {
-  if (!isDatasetIdentifier(datasetId)) {
-    return { ok: false, message: "The dataset identifier is invalid." };
-  }
-  try {
-    const response = await fetch(
-      `${getBackendUrl()}/api/workspaces/${encodeURIComponent(datasetId)}`,
-      { cache: "no-store", headers: { Accept: "application/json" } },
-    );
-    const payload: unknown = await response.json().catch(() => null);
-    if (!response.ok) {
-      return {
-        ok: false,
-        message: extractApiDetail(
-          payload,
-          `Workspace metadata returned HTTP ${response.status}.`,
-        ),
-      };
-    }
-    if (!isWorkspaceDetail(payload)) {
-      return { ok: false, message: "Workspace metadata returned an unexpected response." };
-    }
-    return { ok: true, data: payload };
-  } catch {
-    return {
-      ok: false,
-      message: "Persisted workflow state is unavailable. Confirm that the backend and PostgreSQL are running.",
-    };
-  }
-}
-
 export function isDatasetUploadResponse(
   value: unknown,
 ): value is DatasetUploadResponse {
@@ -382,41 +300,6 @@ export function isDatasetAuditTrail(
       Array.isArray(value.events) &&
       value.events.every(isAuditEvent),
   );
-}
-
-async function getDatasetInspection(path: string): Promise<InspectionResult> {
-  const backendUrl = getBackendUrl();
-
-  try {
-    const response = await fetch(`${backendUrl}${path}`, {
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-    });
-
-    if (!response.ok) {
-      return {
-        ok: false,
-        message: `The inspection API returned HTTP ${response.status}. Confirm that the backend is healthy and try again.`,
-      };
-    }
-
-    const payload: unknown = await response.json();
-    if (!isDatasetInspection(payload)) {
-      return {
-        ok: false,
-        message:
-          "The inspection API returned an unexpected response. Check that the frontend and backend versions match.",
-      };
-    }
-
-    return { ok: true, data: payload };
-  } catch {
-    return {
-      ok: false,
-      message:
-        "DataQuay could not reach the inspection API. Confirm that the backend is running and the backend URL is correct.",
-    };
-  }
 }
 
 export function isDatasetIdentifier(value: string) {
@@ -703,7 +586,7 @@ function isReadinessSummary(value: unknown): value is ReadinessSummary {
   );
 }
 
-function isWorkspaceSummary(value: unknown): value is WorkspaceSummary {
+export function isWorkspaceSummary(value: unknown): value is WorkspaceSummary {
   if (!isRecord(value)) return false;
   return (
     typeof value.dataset_id === "string" &&
@@ -723,7 +606,7 @@ function isWorkspaceSummary(value: unknown): value is WorkspaceSummary {
   );
 }
 
-function isWorkspaceDetail(value: unknown): value is WorkspaceDetail {
+export function isWorkspaceDetail(value: unknown): value is WorkspaceDetail {
   if (!isWorkspaceSummary(value) || !isRecord(value)) return false;
   const candidate = value as WorkspaceSummary & Record<string, unknown>;
   return (
@@ -738,7 +621,7 @@ function isWorkspaceDetail(value: unknown): value is WorkspaceDetail {
   );
 }
 
-function extractApiDetail(payload: unknown, fallback: string) {
+export function extractApiDetail(payload: unknown, fallback: string) {
   if (
     isRecord(payload) &&
     typeof payload.detail === "string" &&
@@ -749,11 +632,11 @@ function extractApiDetail(payload: unknown, fallback: string) {
   return fallback;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object");
 }
 
-function isDatasetInspection(value: unknown): value is DatasetInspection {
+export function isDatasetInspection(value: unknown): value is DatasetInspection {
   if (!value || typeof value !== "object") {
     return false;
   }

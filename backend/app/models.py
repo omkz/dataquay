@@ -23,6 +23,45 @@ class Base(DeclarativeBase):
     pass
 
 
+class User(Base):
+    __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("email", name="uq_users_email"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    email_verified: Mapped[datetime | None] = mapped_column(
+        "emailVerified",
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    image: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class AuthSession(Base):
+    __tablename__ = "sessions"
+    __table_args__ = (
+        UniqueConstraint("sessionToken", name="uq_sessions_session_token"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        "userId",
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+    )
+    expires: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    session_token: Mapped[str] = mapped_column("sessionToken", String(255))
+
+
+class VerificationToken(Base):
+    __tablename__ = "verification_token"
+
+    identifier: Mapped[str] = mapped_column(Text, primary_key=True)
+    token: Mapped[str] = mapped_column(Text, primary_key=True)
+    expires: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class Workspace(Base):
     __tablename__ = "workspaces"
 
@@ -31,6 +70,11 @@ class Workspace(Base):
     workflow_status: Mapped[str] = mapped_column(String(40), default="uploaded")
     current_stage: Mapped[str] = mapped_column(String(40), default="inspection")
     readiness_status: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    owner_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

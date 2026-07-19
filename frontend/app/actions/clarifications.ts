@@ -1,11 +1,11 @@
 "use server";
 
 import {
-  getBackendUrl,
   isDatasetClarifications,
   isDatasetIdentifier,
   type ClarificationActionResult,
 } from "@/lib/dataquay";
+import { authenticatedBackendFetch } from "@/lib/backend-fetch";
 
 export async function loadDatasetClarifications(
   datasetId: string,
@@ -55,7 +55,7 @@ async function requestClarifications(
   try {
     const headers = new Headers(init.headers);
     headers.set("Accept", "application/json");
-    const response = await fetch(`${getBackendUrl()}${path}`, {
+    const response = await authenticatedBackendFetch(path, {
       ...init,
       cache: "no-store",
       headers,

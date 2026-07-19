@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
+from app.auth import CurrentUser, WorkspaceOwner
 from app.schemas import (
     AuditAction,
     AuditStatus,
@@ -21,15 +22,18 @@ router = APIRouter(prefix="/api/workspaces", tags=["workspaces"])
 
 
 @router.get("", response_model=WorkspaceListResponse)
-def list_dataset_workspaces() -> WorkspaceListResponse:
-    return list_workspaces()
+def list_dataset_workspaces(user: CurrentUser) -> WorkspaceListResponse:
+    return list_workspaces(user.user_id)
 
 
 @router.get("/{dataset_id}", response_model=WorkspaceDetail)
-def get_dataset_workspace(dataset_id: str) -> WorkspaceDetail:
+def get_dataset_workspace(
+    dataset_id: str,
+    owner: WorkspaceOwner,
+) -> WorkspaceDetail:
     try:
         resolve_dataset_workflow_workspace(dataset_id)
-        workspace = get_workspace_detail(dataset_id)
+        workspace = get_workspace_detail(dataset_id, owner.user_id)
     except DatasetNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     if workspace is None:
@@ -44,6 +48,7 @@ def get_dataset_workspace(dataset_id: str) -> WorkspaceDetail:
 def update_recommendation_decision(
     dataset_id: str,
     request: RecommendationDecisionRequest,
+    _owner: WorkspaceOwner,
 ) -> RecommendationDecisionResponse:
     try:
         workflow = resolve_dataset_workflow_workspace(dataset_id)

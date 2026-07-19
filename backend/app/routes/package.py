@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
+from app.auth import WorkspaceOwner
 from app.schemas import AuditAction, AuditStatus, PackageGenerationResult
 from app.services.audit_trail import append_audit_event
 from app.services.dataset_workspace import DatasetNotFoundError
@@ -68,6 +69,7 @@ def download_sample_dataset_package() -> FileResponse:
 )
 def generate_uploaded_dataset_package(
     dataset_id: str,
+    _owner: WorkspaceOwner,
 ) -> PackageGenerationResult:
     try:
         workflow = resolve_dataset_workflow_workspace(dataset_id)
@@ -116,7 +118,10 @@ def generate_uploaded_dataset_package(
 
 
 @router.get("/datasets/{dataset_id}/download", response_class=FileResponse)
-def download_uploaded_dataset_package(dataset_id: str) -> FileResponse:
+def download_uploaded_dataset_package(
+    dataset_id: str,
+    _owner: WorkspaceOwner,
+) -> FileResponse:
     try:
         workflow = resolve_dataset_workflow_workspace(dataset_id)
     except DatasetNotFoundError as exc:

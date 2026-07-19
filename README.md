@@ -43,6 +43,21 @@ cd backend
 uv run uvicorn app.main:app --reload --env-file .env.local
 ```
 
+Generate two independent random secrets. Put one in `frontend/.env.local` as
+`AUTH_SECRET`. Put the other in both service files as
+`DATAQUAY_INTERNAL_AUTH_SECRET`; it signs short-lived server-to-server identity
+tokens and must never use a `NEXT_PUBLIC_` prefix.
+
+For local magic-link email, start Mailpit before signing in:
+
+```bash
+docker compose up -d mailpit
+```
+
+Mailpit accepts SMTP on `localhost:1025`; open its local inbox at
+`http://localhost:8025`. Messages are captured locally and are not delivered to
+real addresses.
+
 Local `.env` files are ignored by Git. Never put real provider API keys in the
 committed `.env.example` files.
 
@@ -59,3 +74,10 @@ uv run alembic upgrade head
 
 To verify a rollback during development, run `uv run alembic downgrade base` and
 then reapply `uv run alembic upgrade head`.
+
+The same PostgreSQL database is configured in Next.js with
+`AUTH_DATABASE_URL`. Alembic is the only migration system: Auth.js must not run
+or generate schema migrations. Migration `0002` creates the magic-link users,
+sessions, verification tokens, and nullable workspace ownership. Existing
+unowned workspaces stay inaccessible until an explicit ownership migration is
+designed.

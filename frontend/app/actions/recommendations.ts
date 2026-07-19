@@ -1,12 +1,12 @@
 "use server";
 
 import {
-  getBackendUrl,
   getBackendApiError,
   isDatasetIdentifier,
   isRecommendationResponse,
   type RecommendationActionState,
 } from "@/lib/dataquay";
+import { authenticatedBackendFetch } from "@/lib/backend-fetch";
 
 export async function generateRecommendations(
   previousState: RecommendationActionState,
@@ -30,14 +30,11 @@ export async function generateRecommendations(
     : "/api/inspect/sample-dataset/recommendations";
 
   try {
-    const response = await fetch(
-      `${getBackendUrl()}${recommendationPath}`,
-      {
-        method: "POST",
-        cache: "no-store",
-        headers: { Accept: "application/json" },
-      },
-    );
+    const response = await authenticatedBackendFetch(recommendationPath, {
+      method: "POST",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
     const payload: unknown = await readJsonResponse(response);
 
     const backendError = getBackendApiError(payload);

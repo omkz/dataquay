@@ -1,7 +1,6 @@
 "use server";
 
 import {
-  getBackendUrl,
   isDatasetValidationResult,
   isPackageGenerationResult,
   isRemediationApplyResponse,
@@ -13,6 +12,7 @@ import {
   type RemediationRecommendation,
   type WorkflowActionResult,
 } from "@/lib/dataquay";
+import { authenticatedBackendFetch } from "@/lib/backend-fetch";
 
 export async function previewApprovedRemediation(
   approvedRecommendations: RemediationRecommendation[],
@@ -88,7 +88,7 @@ async function postWorkflowEndpoint<T>(
   label: string,
 ): Promise<WorkflowActionResult<T>> {
   try {
-    const response = await fetch(`${getBackendUrl()}${path}`, {
+    const response = await authenticatedBackendFetch(path, {
       method: "POST",
       cache: "no-store",
       headers: {

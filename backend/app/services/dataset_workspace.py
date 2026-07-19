@@ -82,6 +82,7 @@ def get_dataset_storage_root() -> Path:
 async def create_dataset_workspace(
     upload: UploadFile,
     *,
+    owner_id: int,
     storage_root: str | Path | None = None,
 ) -> DatasetUploadResponse:
     """Persist and safely extract one untrusted ZIP into an isolated workspace."""
@@ -126,7 +127,11 @@ async def create_dataset_workspace(
                 extracted_file.chmod(0o444)
         staging_root.replace(final_root)
         try:
-            create_workspace_record(response, storage_path=str(final_root))
+            create_workspace_record(
+                response,
+                storage_path=str(final_root),
+                owner_id=owner_id,
+            )
             append_audit_event(
                 final_root,
                 dataset_id=dataset_id,

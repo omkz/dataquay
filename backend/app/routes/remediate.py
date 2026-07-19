@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
+from app.auth import WorkspaceOwner
 from app.schemas import (
     AuditAction,
     AuditStatus,
@@ -76,6 +77,7 @@ def apply_sample_dataset_remediation(
 def preview_uploaded_dataset_remediation(
     dataset_id: str,
     request: RemediationPreviewRequest,
+    _owner: WorkspaceOwner,
 ) -> RemediationPreviewResponse:
     try:
         workflow = resolve_dataset_workflow_workspace(dataset_id)
@@ -132,6 +134,7 @@ def preview_uploaded_dataset_remediation(
 def apply_uploaded_dataset_remediation(
     dataset_id: str,
     request: RemediationPreviewRequest,
+    _owner: WorkspaceOwner,
 ) -> RemediationApplyResponse:
     try:
         workflow = resolve_dataset_workflow_workspace(dataset_id)

@@ -1,7 +1,7 @@
 import {
-  getBackendUrl,
   isDatasetIdentifier,
 } from "@/lib/dataquay";
+import { authenticatedBackendFetch } from "@/lib/backend-fetch";
 
 export async function GET(
   _request: Request,
@@ -16,8 +16,8 @@ export async function GET(
   }
 
   try {
-    const response = await fetch(
-      `${getBackendUrl()}/api/audit/datasets/${encodeURIComponent(datasetId)}`,
+    const response = await authenticatedBackendFetch(
+      `/api/audit/datasets/${encodeURIComponent(datasetId)}`,
       { cache: "no-store", headers: { Accept: "application/json" } },
     );
     return new Response(await response.text(), {

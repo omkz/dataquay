@@ -73,7 +73,7 @@ export function UploadLanding({
 
       <footer className="site-footer">
         <span>DataQuay deterministic inspection</span>
-        <span>Local storage · No authentication</span>
+        <span>Local storage · Magic-link protected</span>
       </footer>
     </div>
   );

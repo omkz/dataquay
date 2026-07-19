@@ -67,6 +67,7 @@ def create_workspace_record(
     upload: DatasetUploadResponse,
     *,
     storage_path: str,
+    owner_id: int,
 ) -> None:
     workspace_id = UUID(upload.dataset_id)
     try:
@@ -74,6 +75,7 @@ def create_workspace_record(
             workspace = Workspace(
                 id=workspace_id,
                 name=upload.dataset_name,
+                owner_id=owner_id,
                 workflow_status="uploaded",
                 current_stage="inspection",
             )
@@ -115,12 +117,13 @@ def delete_workspace_record(dataset_id: str) -> None:
         raise PersistenceError("Workspace metadata cleanup failed.") from exc
 
 
-def list_workspaces() -> WorkspaceListResponse:
+def list_workspaces(owner_id: int) -> WorkspaceListResponse:
     try:
         with session_scope() as session:
             rows = session.execute(
                 select(Workspace, DatasetRecord)
                 .join(DatasetRecord, DatasetRecord.workspace_id == Workspace.id)
+                .where(Workspace.owner_id == owner_id)
                 .order_by(Workspace.updated_at.desc())
             ).all()
             return WorkspaceListResponse(
@@ -133,7 +136,7 @@ def list_workspaces() -> WorkspaceListResponse:
         ) from exc
 
 
-def get_workspace_detail(dataset_id: str) -> WorkspaceDetail | None:
+def get_workspace_detail(dataset_id: str, owner_id: int) -> WorkspaceDetail | None:
     workspace_id = _parse_workspace_id(dataset_id)
     if workspace_id is None:
         return None
@@ -142,7 +145,10 @@ def get_workspace_detail(dataset_id: str) -> WorkspaceDetail | None:
             row = session.execute(
                 select(Workspace, DatasetRecord)
                 .join(DatasetRecord, DatasetRecord.workspace_id == Workspace.id)
-                .where(Workspace.id == workspace_id)
+                .where(
+                    Workspace.id == workspace_id,
+                    Workspace.owner_id == owner_id,
+                )
             ).one_or_none()
             if row is None:
                 return None
@@ -173,6 +179,22 @@ def get_workspace_detail(dataset_id: str) -> WorkspaceDetail | None:
             )
     except SQLAlchemyError as exc:
         raise PersistenceError("Workspace metadata could not be loaded.") from exc
+
+
+def workspace_is_owned_by(dataset_id: str, owner_id: int) -> bool:
+    workspace_id = _parse_workspace_id(dataset_id)
+    if workspace_id is None:
+        return False
+    try:
+        with session_scope() as session:
+            return session.scalar(
+                select(Workspace.id).where(
+                    Workspace.id == workspace_id,
+                    Workspace.owner_id == owner_id,
+                )
+            ) is not None
+    except SQLAlchemyError as exc:
+        raise PersistenceError("Workspace ownership could not be verified.") from exc
 
 
 def update_workspace_readiness(

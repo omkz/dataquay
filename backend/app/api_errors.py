@@ -2,6 +2,7 @@ from enum import StrEnum
 
 
 class BackendErrorCode(StrEnum):
+    AUTH_NOT_CONFIGURED = "auth_not_configured"
     DATABASE_NOT_CONFIGURED = "database_not_configured"
     DATABASE_UNAVAILABLE = "database_unavailable"
     AI_NOT_CONFIGURED = "ai_not_configured"
@@ -30,3 +31,7 @@ class AIConfigurationError(ServiceUnavailableError):
 
 class AIServiceError(ServiceUnavailableError):
     error_code = BackendErrorCode.AI_SERVICE_UNAVAILABLE
+
+
+class AuthenticationConfigurationError(ServiceUnavailableError):
+    error_code = BackendErrorCode.AUTH_NOT_CONFIGURED

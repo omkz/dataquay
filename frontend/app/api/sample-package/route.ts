@@ -1,9 +1,9 @@
-import { getBackendUrl } from "@/lib/dataquay";
+import { authenticatedBackendFetch } from "@/lib/backend-fetch";
 
 export async function GET() {
   try {
-    const response = await fetch(
-      `${getBackendUrl()}/api/package/sample-dataset/download`,
+    const response = await authenticatedBackendFetch(
+      "/api/package/sample-dataset/download",
       { cache: "no-store", headers: { Accept: "application/zip" } },
     );
 

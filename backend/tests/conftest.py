@@ -2,8 +2,12 @@ import os
 import pytest
 from sqlalchemy import Engine, event
 
+from app.auth import AuthenticatedUser, require_authenticated_user
 from app.database import get_engine
-from app.models import Base
+from app.main import app
+from app.models import Base, User
+
+TEST_USER_ID = 1
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -29,7 +33,17 @@ def clean_persisted_metadata(persisted_metadata_database: Engine):
     with persisted_metadata_database.begin() as connection:
         for table in reversed(Base.metadata.sorted_tables):
             connection.execute(table.delete())
+        connection.execute(
+            User.__table__.insert().values(
+                id=TEST_USER_ID,
+                email="steward@example.test",
+            )
+        )
+    app.dependency_overrides[require_authenticated_user] = lambda: AuthenticatedUser(
+        user_id=TEST_USER_ID
+    )
     yield
+    app.dependency_overrides.pop(require_authenticated_user, None)
 
 
 def _enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:

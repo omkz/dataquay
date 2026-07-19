@@ -15,7 +15,7 @@ from sqlalchemy.engine import make_url
 
 from app.database import dispose_database_engines, session_scope
 from app.main import app
-from app.models import RecommendationBatch
+from app.models import RecommendationBatch, User
 from app.schemas import RecommendationResponse
 from app.services.workflow_repository import save_recommendation_batch
 
@@ -53,8 +53,18 @@ def test_postgresql_workflow_persists_and_reopens(
             "human_decisions",
             "recommendation_batches",
             "recommendations",
+            "sessions",
+            "users",
+            "verification_token",
             "workspaces",
         }
+        with verification_engine.begin() as connection:
+            connection.execute(
+                User.__table__.insert().values(
+                    id=1,
+                    email="postgres-steward@example.test",
+                )
+            )
         client = TestClient(app)
         upload = client.post(
             "/api/datasets/upload",

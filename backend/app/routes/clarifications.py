@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
+from app.auth import WorkspaceOwner
 from app.schemas import (
     AuditAction,
     AuditStatus,
@@ -28,7 +29,10 @@ router = APIRouter(prefix="/api/clarify", tags=["clarifications"])
 
 
 @router.get("/datasets/{dataset_id}", response_model=DatasetClarifications)
-def get_uploaded_dataset_clarifications(dataset_id: str) -> DatasetClarifications:
+def get_uploaded_dataset_clarifications(
+    dataset_id: str,
+    _owner: WorkspaceOwner,
+) -> DatasetClarifications:
     try:
         workflow = resolve_dataset_workflow_workspace(dataset_id)
         inspection = inspect_dataset_workspace(dataset_id)
@@ -55,6 +59,7 @@ def update_uploaded_dataset_clarification(
     dataset_id: str,
     question_id: str,
     request: ClarificationUpdateRequest,
+    _owner: WorkspaceOwner,
 ) -> DatasetClarifications:
     try:
         workflow = resolve_dataset_workflow_workspace(dataset_id)

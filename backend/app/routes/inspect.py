@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 
 from app.api_errors import ServiceUnavailableError
+from app.auth import WorkspaceOwner
 from app.agents.data_steward import AIConfigurationError, generate_recommendations
 from app.schemas import (
     AuditAction,
@@ -47,7 +48,10 @@ def inspect_sample_dataset() -> DatasetInspection:
 
 
 @router.get("/datasets/{dataset_id}", response_model=DatasetInspection)
-def inspect_uploaded_dataset(dataset_id: str) -> DatasetInspection:
+def inspect_uploaded_dataset(
+    dataset_id: str,
+    _owner: WorkspaceOwner,
+) -> DatasetInspection:
     try:
         resolve_dataset_workflow_workspace(dataset_id)
     except DatasetNotFoundError as exc:
@@ -70,6 +74,7 @@ async def recommend_sample_dataset_remediation() -> RecommendationResponse:
 )
 async def recommend_uploaded_dataset_remediation(
     dataset_id: str,
+    _owner: WorkspaceOwner,
 ) -> RecommendationResponse:
     try:
         workflow = resolve_dataset_workflow_workspace(dataset_id)

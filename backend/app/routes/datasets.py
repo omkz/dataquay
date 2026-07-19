@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 
+from app.auth import CurrentUser
 from app.schemas import DatasetUploadResponse
 from app.services.dataset_workspace import (
     DatasetUploadError,
@@ -21,9 +22,10 @@ router = APIRouter(prefix="/api/datasets", tags=["datasets"])
 )
 async def upload_dataset(
     file: Annotated[UploadFile, File(description="ZIP research dataset")],
+    user: CurrentUser,
 ) -> DatasetUploadResponse:
     try:
-        return await create_dataset_workspace(file)
+        return await create_dataset_workspace(file, owner_id=user.user_id)
     except UploadTooLargeError as exc:
         raise HTTPException(status_code=413, detail=str(exc)) from exc
     except UnsupportedUploadError as exc:

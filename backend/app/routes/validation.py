@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
+from app.auth import WorkspaceOwner
 from app.schemas import AuditAction, AuditStatus, DatasetValidationResult
 from app.services.audit_trail import append_audit_event, commit_audited_mutation
 from app.services.dataset_workspace import DatasetNotFoundError
@@ -45,6 +46,7 @@ def validate_sample_dataset_remediation() -> DatasetValidationResult:
 )
 def validate_uploaded_dataset_remediation(
     dataset_id: str,
+    _owner: WorkspaceOwner,
 ) -> DatasetValidationResult:
     try:
         workflow = resolve_dataset_workflow_workspace(dataset_id)

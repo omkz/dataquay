@@ -9,6 +9,12 @@ cp .env.example .env.local
 npm run dev
 ```
 
+Configure `AUTH_SECRET`, `AUTH_DATABASE_URL`, `EMAIL_SERVER`, `EMAIL_FROM`, and
+the shared server-only `DATAQUAY_INTERNAL_AUTH_SECRET` in `.env.local`. Run the
+root `compose.yaml` Mailpit service to inspect local magic-link messages at
+`http://localhost:8025`. Database tables are managed only by backend Alembic
+migrations.
+
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.

@@ -1,4 +1,4 @@
-import { getBackendUrl } from "@/lib/dataquay";
+import { authenticatedBackendFetch } from "@/lib/backend-fetch";
 
 const MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024;
 
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
     const backendForm = new FormData();
     backendForm.append("file", file, file.name);
-    const response = await fetch(`${getBackendUrl()}/api/datasets/upload`, {
+    const response = await authenticatedBackendFetch("/api/datasets/upload", {
       method: "POST",
       cache: "no-store",
       headers: { Accept: "application/json" },

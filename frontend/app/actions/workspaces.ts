@@ -1,11 +1,11 @@
 "use server";
 
 import {
-  getBackendUrl,
   isDatasetIdentifier,
   type RecommendationDecision,
   type RecommendationDecisionResult,
 } from "@/lib/dataquay";
+import { authenticatedBackendFetch } from "@/lib/backend-fetch";
 
 export async function saveRecommendationDecision(
   datasetId: string,
@@ -20,8 +20,8 @@ export async function saveRecommendationDecision(
   }
 
   try {
-    const response = await fetch(
-      `${getBackendUrl()}/api/workspaces/${encodeURIComponent(datasetId)}/decision`,
+    const response = await authenticatedBackendFetch(
+      `/api/workspaces/${encodeURIComponent(datasetId)}/decision`,
       {
         method: "PUT",
         cache: "no-store",
