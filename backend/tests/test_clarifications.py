@@ -8,6 +8,7 @@ import pytest
 from app.main import app
 from app.schemas import ClarificationUpdateRequest, RecommendationResponse
 from app.services.clarifications import (
+    ClarificationError,
     ClarificationQuestionNotFoundError,
     get_dataset_clarifications,
     update_dataset_clarification,
@@ -201,6 +202,51 @@ def test_uploaded_clarification_api_preserves_originals_audits_activity_and_info
     assert "documented missing-data sentinel" not in audit_text
     assert _directory_contents(workspace / "original") == originals_before
     assert not (workspace / "working-copy").exists()
+
+
+def test_snapshot_write_failure_does_not_fail_committed_clarification_response(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage_root = tmp_path / "datasets"
+    monkeypatch.setenv("DATAQUAY_DATA_ROOT", str(storage_root))
+    upload = _upload_sample_dataset()
+    dataset_id = str(upload["dataset_id"])
+    workspace = storage_root / dataset_id
+
+    initial = client.get(f"/api/clarify/datasets/{dataset_id}")
+    assert initial.status_code == 200
+    question = initial.json()["questions"][0]
+    snapshot_path = workspace / "clarifications" / "questions.json"
+    snapshot_before = snapshot_path.read_bytes()
+
+    def fail_snapshot_write(*_args, **_kwargs) -> None:
+        raise ClarificationError("snapshot mirror unavailable")
+
+    with monkeypatch.context() as snapshot_patch:
+        snapshot_patch.setattr(
+            "app.services.clarifications._write_clarifications",
+            fail_snapshot_write,
+        )
+        response = client.put(
+            f"/api/clarify/datasets/{dataset_id}/questions/{question['question_id']}",
+            json={"decision": "answer", "answer": "Confirmed study context."},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["summary"]["answered_count"] == 1
+    assert snapshot_path.read_bytes() == snapshot_before
+
+    reopened = client.get(f"/api/clarify/datasets/{dataset_id}")
+    assert reopened.status_code == 200
+    assert reopened.json()["summary"]["answered_count"] == 1
+    assert "Confirmed study context." in snapshot_path.read_text()
+
+    audit = client.get(f"/api/audit/datasets/{dataset_id}")
+    assert [event["action"] for event in audit.json()["events"]] == [
+        "upload",
+        "clarification_response",
+    ]
 
 
 @pytest.mark.parametrize(

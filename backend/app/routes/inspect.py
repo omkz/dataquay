@@ -81,6 +81,7 @@ async def recommend_uploaded_dataset_remediation(
             workflow.workspace_directory,
             dataset_id=dataset_id,
             findings=inspection.findings,
+            use_snapshot=False,
         )
         clarifications = sync_clarifications(generated_clarifications)
         store_dataset_clarifications(workflow.workspace_directory, clarifications)

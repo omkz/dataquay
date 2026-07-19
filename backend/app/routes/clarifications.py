@@ -36,6 +36,7 @@ def get_uploaded_dataset_clarifications(dataset_id: str) -> DatasetClarification
             workflow.workspace_directory,
             dataset_id=dataset_id,
             findings=inspection.findings,
+            use_snapshot=False,
         )
         clarifications = sync_clarifications(generated)
         store_dataset_clarifications(workflow.workspace_directory, clarifications)
@@ -66,6 +67,7 @@ def update_uploaded_dataset_clarification(
             workflow.workspace_directory,
             dataset_id=dataset_id,
             findings=inspection.findings,
+            use_snapshot=False,
         )
         synced = sync_clarifications(generated)
         store_dataset_clarifications(workflow.workspace_directory, synced)
@@ -76,6 +78,7 @@ def update_uploaded_dataset_clarification(
             question_id=question_id,
             update=request,
             persist=False,
+            use_snapshot=False,
         )
         updated_question = next(
             question

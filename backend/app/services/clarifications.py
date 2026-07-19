@@ -49,10 +49,15 @@ def get_dataset_clarifications(
     *,
     dataset_id: str,
     findings: list[InspectionFinding],
+    use_snapshot: bool = True,
 ) -> DatasetClarifications:
-    """Generate focused questions and merge any locally persisted responses."""
+    """Generate questions, optionally merging the compatibility snapshot."""
     workspace = Path(workspace_directory).resolve()
-    stored = _read_clarifications(workspace, dataset_id=dataset_id)
+    stored = (
+        _read_clarifications(workspace, dataset_id=dataset_id)
+        if use_snapshot
+        else None
+    )
     stored_by_id = {
         question.question_id: question
         for question in stored.questions
@@ -75,7 +80,7 @@ def get_dataset_clarifications(
         questions.append(generated)
 
     result = _build_response(dataset_id, questions)
-    if stored is None or stored != result:
+    if use_snapshot and (stored is None or stored != result):
         _write_clarifications(workspace, result)
     return result
 
@@ -88,6 +93,7 @@ def update_dataset_clarification(
     question_id: str,
     update: ClarificationUpdateRequest,
     persist: bool = True,
+    use_snapshot: bool = True,
 ) -> DatasetClarifications:
     """Prepare one human answer or deferral and optionally store its snapshot."""
     workspace = Path(workspace_directory).resolve()
@@ -95,6 +101,7 @@ def update_dataset_clarification(
         workspace,
         dataset_id=dataset_id,
         findings=findings,
+        use_snapshot=use_snapshot,
     )
     matching = next(
         (question for question in current.questions if question.question_id == question_id),
@@ -137,8 +144,13 @@ def store_dataset_clarifications(
     workspace_directory: str | Path,
     clarifications: DatasetClarifications,
 ) -> None:
-    """Write a compatibility snapshot after PostgreSQL state is committed."""
-    _write_clarifications(Path(workspace_directory).resolve(), clarifications)
+    """Best-effort mirror of PostgreSQL clarification state for compatibility."""
+    try:
+        _write_clarifications(Path(workspace_directory).resolve(), clarifications)
+    except ClarificationError:
+        # PostgreSQL is authoritative. Snapshot failures must not invalidate a
+        # response whose workflow mutation and audit event already committed.
+        pass
 
 
 def _question_for_finding(finding: InspectionFinding) -> ClarificationQuestion:
