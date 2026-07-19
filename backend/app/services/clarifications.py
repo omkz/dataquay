@@ -271,11 +271,11 @@ def _write_clarifications(
     clarifications: DatasetClarifications,
 ) -> None:
     directory = workspace / CLARIFICATION_DIRECTORY_NAME
-    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     destination = directory / CLARIFICATION_FILE_NAME
     temporary = directory / f".{CLARIFICATION_FILE_NAME}.{uuid4().hex}.tmp"
     payload = clarifications.model_dump_json(indent=2) + "\n"
     try:
+        directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         descriptor = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         try:
             view = memoryview(payload.encode("utf-8"))

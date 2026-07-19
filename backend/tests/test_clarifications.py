@@ -271,3 +271,23 @@ def test_clarification_api_rejects_unknown_dataset_identifiers(
     response = client.request(method, path.format(id=MISSING_DATASET_ID), json=json)
     assert response.status_code == 404
     assert response.json() == {"detail": "Dataset workspace was not found."}
+
+
+def test_snapshot_mkdir_failure_is_wrapped(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inspection = inspect_dataset(SAMPLE_DATASET_PATH)
+
+    monkeypatch.setattr(
+        Path,
+        "mkdir",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("mkdir failed")),
+    )
+
+    with pytest.raises(ClarificationError):
+        get_dataset_clarifications(
+            tmp_path,
+            dataset_id="00000000-0000-4000-8000-000000000001",
+            findings=inspection.findings,
+        )
